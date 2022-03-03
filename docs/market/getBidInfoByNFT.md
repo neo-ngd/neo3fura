@@ -2,23 +2,22 @@
 Gets the nft bid info 
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| Address     | string|  the user's address|required|
-| AssetHash     | string|  the asset scriptHash|optional|
-| TokenId     | string|  the nft token's| optional |
-| MarketHash     | string| the marketplace hash | optional |
+| Address     | string|  the user's address|Required |
+| AssetHash     | string|  the asset scriptHash|Optional|
+| TokenId     | string|  the nft token's| Optional |
+| MarketHash     | string| the marketplace hash | Optional |
 
 
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request GET 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: text/plain' \
@@ -35,7 +34,8 @@ curl --location --request GET 'https://testneofura.ngd.network:444' \
   "id": 1
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
   "id": 1,

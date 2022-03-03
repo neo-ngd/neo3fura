@@ -1,16 +1,17 @@
 # GetBlockCount
-Gets the total blocks of the chain
+Gets the total blocks of the blockchain.
 <hr>
+### Parameters
 
-### Request
+None
 
-> POST https://testneofura.ngd.network:444
+### Example
 
-#### Body Parameters
-none
+Request body
 
 
-#### Example
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -21,7 +22,9 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
     "method": "GetBlockCount"
 }'
 ```
-### Response
+Response body
+
+
 ```json5
 {
     "id": 1,

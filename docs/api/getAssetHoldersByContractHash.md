@@ -1,21 +1,21 @@
 # GetAssetHoldersByContractHash
 Gets the asset holders with the contract script hash
 <hr>
+### Parameters
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
-
-|    name    | type | description | Required |
+|    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| ContractHash     | string|  contract script hash| required|
-| Limit    | int|  the number of items to return| optional|
-| Skip    | int|  the number of items to return| optional |
+| ContractHash     | string| The contract script hash | Required|
+| Limit    | int|  The number of items to return| Optional|
+| Skip    | int|  The number of items to return| Optional |
+
+### Example
+
+Request body
 
 
-#### Example
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -26,7 +26,9 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "id": 1
 }'
 ```
-### Response
+Response body
+
+
 ```json5
 {
   "id": 1,

@@ -54,7 +54,8 @@ type wireRequest struct {
 type wireResponse struct {
 	// VersionTag is always encoded as the string "2.0"
 	VersionTag wireVersionTag `json:"jsonrpc"`
-	// Result is the response value, and is required on success.
+	// Result is the response value, and is Required
+ on success.
 	Result *json.RawMessage `json:"result,omitempty"`
 	// Error is a structured error response if the call fails.
 	Error *wireError `json:"error,omitempty"`

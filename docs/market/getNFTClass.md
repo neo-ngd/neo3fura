@@ -2,22 +2,21 @@
 get PrimaryMarket classification
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| AssetHash     | string|  the asset scriptHash| required |
-| MarketHash     | string| the marketplace hash | required|
-| SubClass     | Array| the tokenIds class | required |
+| AssetHash     | string|  the asset scriptHash| Required |
+| MarketHash     | string| the marketplace hash | Required |
+| SubClass     | Array| the tokenIds class | Required |
 
 
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request GET 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -32,7 +31,8 @@ curl --location --request GET 'https://testneofura.ngd.network:444' \
   "id": 1
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
   "id": 1,

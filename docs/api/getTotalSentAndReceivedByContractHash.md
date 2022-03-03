@@ -2,19 +2,17 @@
 Gets the total sent and received amount by contract hash
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| ContractHash     | string|  contract script hash| required|
-| Address   | string|  user's address| required|
+| ContractHash     | string|  contract script hash| Required |Required | Address   | string|  user's address| Required|
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -25,7 +23,8 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "id": 1
   }'
 ```
-### Response
+Response body
+
 ```json5
 {
     "id": 1,

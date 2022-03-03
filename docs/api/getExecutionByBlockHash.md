@@ -1,19 +1,17 @@
 # GetExecutionByBlockHash
 
-Gets the execution by blockhash
+Gets the execution by the block hash.
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| BlockHash      | string|  the blockHash of the block| required
+| BlockHash      | string| The block hash | Required|
 
+### Example
 
-#### Example
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -24,7 +22,8 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
     "method": "GetExecutionByBlockHash"
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
     "id": 1,

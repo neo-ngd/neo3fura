@@ -2,14 +2,13 @@
 Gets the total votes of all candidates
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 none
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -20,7 +19,8 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "id": 1
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
   "id": 1,

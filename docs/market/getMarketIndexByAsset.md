@@ -2,21 +2,20 @@
 get PrimaryMarket classification
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| AssetHash     | string|  the asset scriptHash| required |
-| MarketHash     | string| the marketplace hash | required|
+| AssetHash     | string|  the asset scriptHash| Required |
+| MarketHash     | string| the marketplace hash | Required |
 
 
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 {
   "jsonrpc": "2.0",
@@ -28,7 +27,8 @@ get PrimaryMarket classification
   "id": 1
 }
 ```
-### Response
+Response body
+
 ```json5
 
 {

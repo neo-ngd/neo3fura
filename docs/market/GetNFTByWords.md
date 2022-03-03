@@ -2,23 +2,22 @@
 Fuzzy search by name of NFT 
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| PrimaryMarket | string | the Primary marketplace hash | optional |
-| SecondaryMarket    | string| the Secondary marketplace hash | optional |
-| Words | string |    search item  | required |
-| Limit    | int|  the number of items to return| optional|
-| Skip    | int|  the number of items to return| optional |
+| PrimaryMarket | string | the Primary marketplace hash | Optional |
+| SecondaryMarket    | string| the Secondary marketplace hash | Optional |
+| Words | string |    search item  | Required |
+| Limit    | int|  The number of items to return| Optional|
+| Skip    | int|  The number of items to return| Optional |
 
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request GET 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: text/plain' \
@@ -35,7 +34,8 @@ curl --location --request GET 'https://testneofura.ngd.network:444' \
   "id": 1
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
   "id": 1,

@@ -1,20 +1,19 @@
 # GetBlockHeaderByBlockHeight
 
-Gets the blockheader by the blockheight
+Gets the block header by the block height.
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| BlockHeight     | int|  the blockHeight| required |
+| BlockHeight     | int| The block height | Required |
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -25,7 +24,8 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
     "method": "GetBlockHeaderByBlockHeight"
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
     "id": 1,

@@ -1,16 +1,17 @@
-#GetCandidateCount
+# GetCandidateCount
+
 Gets the count of candidates
+
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
-none
+### Parameters
+None
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -21,7 +22,8 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "id": 1
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
     "id": 1,

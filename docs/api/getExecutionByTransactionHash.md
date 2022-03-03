@@ -1,19 +1,18 @@
 # GetExecutionByTransactionHash
-Gets the execution by transactionhash
+Gets the execution by the transaction hash
 <hr>
 
-### Request
+### Parameters
 
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
-
-|    name    | type | description | Required |
+|    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| TransactionHash     | string|  the transactionHash| required|
+| TransactionHash     | string| The transaction Hash | Required |
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -24,7 +23,8 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
     "method": "GetExecutionByTransactionHash"
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
     "id": 1,

@@ -2,22 +2,21 @@
 get nft token info by contractHash and tokenId
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| ContractHash     | string|  the contractHash| required |
-| MarketHash     | string| the  marketplace hash | optional |
-| TokenIds    | Array| Array of nft token id| optional |
+| ContractHash     | string|  the contractHash| Required |
+| MarketHash     | string| the  marketplace hash | Optional |
+| TokenIds    | Array| Array of nft token id| Optional |
 
 
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request GET 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: text/plain' \
@@ -34,7 +33,8 @@ curl --location --request GET 'https://testneofura.ngd.network:444' \
 }
 '
 ```
-### Response
+Response body
+
 ```json5
 {
   "id": 1,

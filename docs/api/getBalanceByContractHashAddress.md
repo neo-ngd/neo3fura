@@ -1,21 +1,21 @@
 # GetBalanceByContractHashAddress
-Gets the asset balance by the asset contract script hash and user's address
+Gets the asset balance by the given asset contract script hash and user's address
 
 <hr>
+### Parameters
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
-
-|    name    | type | description | Required |
+|    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| ContractHash     | string|  contract script hash| required|
-| Address   | string|  user's address| required|
+| ContractHash     | string| The contract script hash | Required|
+| Address   | string| The user's address | Required|
+
+### Example
+
+Request body
 
 
-#### Example
+Request body
+
 ```
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -26,7 +26,9 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "id": 1
 }'
 ```
-### Response
+Response body
+
+
 ```json5
 {
   "id": 1,

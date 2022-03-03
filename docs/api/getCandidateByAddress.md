@@ -1,19 +1,18 @@
 # GetCandidateByAddress
-Gets the candidate by the candidate address
+Gets the candidate information by the candidate address.
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
-| Address      | string|  the candidate address| required |
+| Address      | string|  The candidate address| Required |
 
 
-#### Example
+### Example
+
+Request body
+
 ```
 curl --location --request GET 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
@@ -24,7 +23,8 @@ curl --location --request GET 'https://testneofura.ngd.network:444' \
     "id": 1
 }'
 ```
-### Response
+Response body
+
 ```json5
 {
   "id": 1,
