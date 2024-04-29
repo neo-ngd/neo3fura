@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (me *T) GetBlockInfoList(args struct {
@@ -36,20 +37,30 @@ func (me *T) GetBlockInfoList(args struct {
 						bson.M{"$match": bson.M{"$expr": bson.M{"$and": []interface{}{
 							bson.M{"$eq": []interface{}{"$blockhash", "$$blockhash"}},
 						}}}},
-						bson.M{"$group": bson.M{"_id": "$_id"}},
-						bson.M{"$count": "count"},
+						//bson.M{"$group": bson.M{"_id": "$_id"}},
+						//bson.M{"$count": "count"},
 					},
 					"as": "info"},
 				},
 				//bson.M{"$match": bson.M{"info": bson.M{"$elemMatch": bson.M{"$ne": nil}}}},
-				bson.M{"$project": bson.M{"transactioncount": bson.M{"$cond": bson.M{"if": bson.M{"$gt": []interface{}{"$info", []interface{}{}}}, "then": bson.M{"$arrayElemAt": []interface{}{"$info.count", 0}}, "else": 0}},
-					"_id": 1, "index": 1, "size": 1, "timestamp": 1, "hash": 1}},
+				//bson.M{"$project": bson.M{"transactioncount": bson.M{"$cond": bson.M{"if": bson.M{"$gt": []interface{}{"$info", []interface{}{}}}, "then": bson.M{"$arrayElemAt": []interface{}{"$info.count", 0}}, "else": 0}},
+				//	"_id": 1, "index": 1, "size": 1, "timestamp": 1, "hash": 1}},
+
+				bson.M{"$project": bson.M{"info": 1, "_id": 1, "index": 1, "size": 1, "timestamp": 1, "hash": 1}},
 
 				bson.M{"$limit": args.Limit},
 				bson.M{"$skip": args.Skip},
 			},
 			Query: []string{}}, ret)
 
+	for _, item := range r1 {
+		info := item["info"]
+		item["transactioncount"] = 0
+		if info != nil {
+			item["transactioncount"] = len(info.(primitive.A))
+		}
+		delete(item, "info")
+	}
 	count, err := me.Client.QueryDocument(struct {
 		Collection string
 		Index      string
