@@ -6,13 +6,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/joeqian10/neo3-gogogo/rpc"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
 	log2 "neo3fura_http/lib/log"
+	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
 )
@@ -135,11 +138,11 @@ func (me *T) QueryAll(args struct {
 	Skip       int64
 }, ret *json.RawMessage) ([]map[string]interface{}, int64, error) {
 
-	//if args.Limit == 0 {
-	//	args.Limit = limit2.DefaultLimit
-	//} else if args.Limit > limit2.MaxLimit {
-	//	args.Limit = limit2.MaxLimit
-	//}
+	if args.Limit == 0 {
+		args.Limit = consts.DefaultLimit
+	} else if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
 
 	var results []map[string]interface{}
 	convert := make([]map[string]interface{}, 0)
@@ -337,17 +340,17 @@ func (me *T) QueryAggregate(args struct {
 	Query      []string
 }, ret *json.RawMessage) ([]map[string]interface{}, error) {
 
-	//for _, v := range args.Pipeline {
-	//	limit := v["$limit"]
-	//	if limit != nil {
-	//		if limit.(int64) == 0 {
-	//			v["$limit"] = limit2.DefaultLimit
-	//		}
-	//		if limit.(int64) > limit2.MaxLimit {
-	//			v["$limit"] = limit2.MaxLimit
-	//		}
-	//	}
-	//}
+	for _, v := range args.Pipeline {
+		limit := v["$limit"]
+		if limit != nil {
+			if limit.(int64) == 0 {
+				v["$limit"] = consts.DefaultLimit
+			}
+			if limit.(int64) > consts.MaxLimit {
+				v["$limit"] = consts.MaxLimit
+			}
+		}
+	}
 
 	var results []map[string]interface{}
 	convert := make([]map[string]interface{}, 0)
