@@ -3,16 +3,18 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"math"
+
 	"neo3fura_http/lib/type/NFTstate"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/strval"
 	"neo3fura_http/var/stderr"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (me *T) GetNFTByContractHashTokenId(args struct {
@@ -306,7 +308,7 @@ func (me *T) GetNFTByContractHashTokenId(args struct {
 						}
 					}
 
-					if item["name"] != nil && item["name"].(string) == "Nuanced Floral Symphony" || item["name"].(string) == "Sunshine #1" || strings.HasPrefix(item["name"].(string), "Virtual Visions") {
+					if item["name"] != nil && (item["name"].(string) == "Nuanced Floral Symphony" || item["name"].(string) == "Sunshine #1" || strings.HasPrefix(item["name"].(string), "Virtual Visions")) {
 						item["video"] = item["image"]
 						delete(item, "image")
 					}
