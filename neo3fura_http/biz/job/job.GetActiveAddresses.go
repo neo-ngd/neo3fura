@@ -2,6 +2,7 @@ package job
 
 import (
 	"encoding/json"
+
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -42,11 +43,8 @@ func (me T) GetActiveAddresses() error {
 	for _, item := range r1 {
 		r2[item["sender"].(string)] = true
 	}
-	var i = 0
-	for _, _ = range r2 {
-		i++
-	}
-	data := bson.M{"ActiveAddresses": i}
+
+	data := bson.M{"ActiveAddresses": len(r2), "insertTime": r0["blocktime"]}
 	_, err = me.Client.SaveJob(struct {
 		Collection string
 		Data       bson.M

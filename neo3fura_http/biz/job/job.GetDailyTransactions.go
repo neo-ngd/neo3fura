@@ -2,6 +2,7 @@ package job
 
 import (
 	"encoding/json"
+
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -38,7 +39,7 @@ func (me T) GetDailyTransactions() error {
 	if err != nil {
 		return err
 	}
-	data := bson.M{"DailyTransactions": len(r1)}
+	data := bson.M{"DailyTransactions": len(r1), "insertTime": r0["blocktime"]}
 	_, err = me.Client.SaveJob(struct {
 		Collection string
 		Data       bson.M
