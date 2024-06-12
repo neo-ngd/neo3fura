@@ -2,6 +2,7 @@ package job
 
 import (
 	"encoding/json"
+
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -34,7 +35,7 @@ func (me T) GetNewAddresses() error {
 		return err
 	}
 
-	data := bson.M{"NewAddresses": count}
+	data := bson.M{"NewAddresses": count, "insertTime": r0["blocktime"]}
 	_, err = me.Client.SaveJob(struct {
 		Collection string
 		Data       bson.M

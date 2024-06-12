@@ -2,6 +2,7 @@ package job
 
 import (
 	"encoding/json"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -77,7 +78,7 @@ func (me T) GetPopularTokens() error {
 		}
 	}
 
-	data := bson.M{"Populars": values}
+	data := bson.M{"Populars": values, "insertTime": r0["timestamp"]}
 	_, err = me.Client.SaveJob(struct {
 		Collection string
 		Data       bson.M
