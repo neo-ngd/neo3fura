@@ -5,19 +5,21 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io/ioutil"
 	"math/big"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+
 	"neo3fura_http/lib/joh"
 	log2 "neo3fura_http/lib/log"
 	"neo3fura_http/lib/type/Contract"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
 )
 
 // 广告位NFT
@@ -189,6 +191,7 @@ func (me *T) GetMarketCollections(args struct {
 										}
 										ss := string(tb[:])
 										if ss == "" {
+											log2.Fatal(item["asset"], item["tokenid"], item["image"])
 											item["thumbnail"] = ImagUrl(item["asset"].(string), item["image"].(string), "thumbnail")
 										} else {
 											item["thumbnail"] = ImagUrl(asset, string(tb[:]), "thumbnail")
