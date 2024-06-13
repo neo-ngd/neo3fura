@@ -22,20 +22,31 @@ func (me T) GetNewAddresses() error {
 		return err
 	}
 
-	_, count, err := me.Client.QueryAll(struct {
+	r1, err := me.Client.QueryAggregate(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
 		Filter     bson.M
+		Pipeline   []bson.M
 		Query      []string
-		Limit      int64
-		Skip       int64
-	}{Collection: "Address", Index: "GetNewAddresses", Filter: bson.M{"firstusetime": bson.M{"$gt": r0["blocktime"].(int64) - 3600*24*1000}}}, ret)
+	}{
+		Collection: "Address",
+		Index:      "GetNewAddresses",
+		Sort:       bson.M{},
+		Filter:     bson.M{},
+		Pipeline: []bson.M{
+			bson.M{"$match": bson.M{"firstusetime": bson.M{"$gt": r0["blocktime"].(int64) - 3600*24*1000}}},
+			bson.M{"$group": bson.M{"_id": "$_id"}},
+			bson.M{"$count": "count"},
+		},
+		Query: []string{},
+	}, ret)
+
 	if err != nil {
 		return err
 	}
 
-	data := bson.M{"NewAddresses": count, "insertTime": r0["blocktime"]}
+	data := bson.M{"NewAddresses": r1[0]["count"], "insertTime": r0["blocktime"]}
 	_, err = me.Client.SaveJob(struct {
 		Collection string
 		Data       bson.M
