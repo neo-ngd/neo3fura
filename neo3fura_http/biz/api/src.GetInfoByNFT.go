@@ -2,19 +2,20 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"io/ioutil"
 	"math/big"
-	"neo3fura_http/lib/type/Contract"
-	"neo3fura_http/lib/type/h160"
-	"neo3fura_http/lib/type/strval"
-	"neo3fura_http/var/stderr"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+
+	"neo3fura_http/lib/type/Contract"
+	"neo3fura_http/lib/type/h160"
+	"neo3fura_http/lib/type/strval"
+	"neo3fura_http/var/stderr"
 )
 
 func (me *T) GetInfoByNFT(args struct {
@@ -246,7 +247,7 @@ func GetNNSByAddress(address string) (string, string, error) {
 	} else if rt == "test" {
 		url = "https://megaoasis.ngd.network:8889/profile/get?address=" //test
 	}
-	fmt.Println(url + address)
+	//fmt.Println(url + address)
 	resp, err := http.Get(url + address)
 	if err != nil {
 		return "", "", err
@@ -254,7 +255,7 @@ func GetNNSByAddress(address string) (string, string, error) {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	var nns, userName string
-	fmt.Println("body:", string(body))
+	//fmt.Println("body:", string(body))
 	if string(body) != "" && string(body) != "null" {
 		var data map[string]interface{}
 		err = json.Unmarshal(body, &data)
