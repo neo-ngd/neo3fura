@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	"go.mongodb.org/mongo-driver/bson"
+
+	"neo3fura_http/lib/type/consts"
 )
 
 func (me T) GetActiveAddresses() error {
@@ -35,6 +37,7 @@ func (me T) GetActiveAddresses() error {
 		Sort:       bson.M{},
 		Filter:     bson.M{"blocktime": bson.M{"$gt": r0["blocktime"].(int64) - 3600*24*1000}},
 		Query:      []string{},
+		Limit:      consts.MaxLimit,
 	}, ret)
 	if err != nil {
 		return err
