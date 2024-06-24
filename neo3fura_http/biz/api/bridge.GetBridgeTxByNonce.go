@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"strconv"
+
 	"go.mongodb.org/mongo-driver/bson"
+
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
-	"strconv"
 )
 
 func (me *T) GetBridgeTxByNonce(args struct {
@@ -32,7 +34,7 @@ func (me *T) GetBridgeTxByNonce(args struct {
 		Index:      "GetBridgeTxByNonce",
 		Sort:       bson.M{"_id": -1},
 		Filter: bson.M{"contract": args.ContractHash.Val(),
-			"$or":                 []interface{}{bson.M{"eventname": "Withdrawal"}, bson.M{"eventname": "Claimable"}},
+			"$or":                 []interface{}{bson.M{"eventname": "GasWithdrawal"}, bson.M{"eventname": "Claimable"}},
 			"state.value.0.value": nonceStr,
 		},
 		Query: []string{},
