@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/strval"
 	"neo3fura_http/var/stderr"
@@ -39,7 +40,12 @@ func (me *T) GetAssetInfos(args struct {
 			f = bson.M{"$or": addresses}
 		}
 	}
-	r1, _, err := me.Client.QueryAll(struct {
+
+	if args.Standard == "NEP17" || args.Standard == "NEP11" {
+		f["type"] = args.Standard.Val()
+	}
+
+	r1, count, err := me.Client.QueryAll(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -57,6 +63,8 @@ func (me *T) GetAssetInfos(args struct {
 	if err != nil {
 		return err
 	}
+
+	fmt.Println("count:", count)
 	// retrieve all tokens
 	r2, err := me.Client.QueryLastJob(struct{ Collection string }{Collection: "PopularTokens"})
 	if err != nil {
@@ -127,23 +135,23 @@ func (me *T) GetAssetInfos(args struct {
 		}
 	}
 
-	r5 := make([]map[string]interface{}, 0)
-	r6 := make([]map[string]interface{}, 0)
-	for _, item := range r1 {
-		if args.Standard == "" || (args.Standard == "NEP11" && item["type"] == "NEP11") || (args.Standard == "NEP17" && item["type"] == "NEP17") {
-			r5 = append(r5, item)
-		}
-	}
-	for i, item := range r5 {
-		if int64(i) < args.Skip {
-			continue
-		} else if int64(i) > args.Skip+args.Limit-1 {
-			continue
-		} else {
-			r6 = append(r6, item)
-		}
-	}
-	r4, err := me.FilterArrayAndAppendCount(r6, int64(len(r5)), args.Filter)
+	//r5 := make([]map[string]interface{}, 0)
+	//r6 := make([]map[string]interface{}, 0)
+	//for _, item := range r1 {
+	//	if args.Standard == "" || (args.Standard == "NEP11" && item["type"] == "NEP11") || (args.Standard == "NEP17" && item["type"] == "NEP17") {
+	//		r5 = append(r5, item)
+	//	}
+	//}
+	//for i, item := range r5 {
+	//	if int64(i) < args.Skip {
+	//		continue
+	//	} else if int64(i) > args.Skip+args.Limit-1 {
+	//		continue
+	//	} else {
+	//		//r6 = append(r6, item)
+	//	}
+	//}
+	r4, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
 	if err != nil {
 		return err
 	}
