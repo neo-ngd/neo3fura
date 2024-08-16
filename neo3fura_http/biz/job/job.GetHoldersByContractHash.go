@@ -2,6 +2,7 @@ package job
 
 import (
 	"encoding/json"
+
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -42,6 +43,7 @@ func (me T) GetHoldersByContractHash() error {
 			Sort:       bson.M{"balance": -1},
 			Filter:     bson.M{"asset": item["hash"], "balance": bson.M{"$gt": 0}},
 			Query:      []string{},
+			Limit:      int64(1000),
 		}, ret)
 		if err != nil {
 			return err
