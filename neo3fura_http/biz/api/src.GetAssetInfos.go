@@ -59,6 +59,8 @@ func (me *T) GetAssetInfos(args struct {
 		Sort:       bson.M{},
 		Filter:     f,
 		Query:      []string{},
+		Skip:       args.Skip,
+		Limit:      args.Limit,
 	}, ret)
 	if err != nil {
 		return err
@@ -148,7 +150,7 @@ func (me *T) GetAssetInfos(args struct {
 	//	} else if int64(i) > args.Skip+args.Limit-1 {
 	//		continue
 	//	} else {
-	//		//r6 = append(r6, item)
+	//		r6 = append(r6, item)
 	//	}
 	//}
 	r4, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
