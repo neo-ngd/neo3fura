@@ -339,12 +339,11 @@ func (me *T) QueryAggregate(args struct {
 	Pipeline   []bson.M
 	Query      []string
 }, ret *json.RawMessage) ([]map[string]interface{}, error) {
-
 	for _, v := range args.Pipeline {
 		limit := v["$limit"]
 		if limit != nil {
 			if limit.(int64) == 0 {
-				v["$limit"] = consts.DefaultLimit
+				//	v["$limit"] = consts.DefaultLimit
 			}
 			if limit.(int64) > consts.MaxLimit {
 				v["$limit"] = consts.MaxLimit
