@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
 	log2 "neo3fura_ws/lib/log"
 )
 
@@ -118,6 +120,59 @@ func (me *T) QueryAll(args struct {
 	}
 	*ret = json.RawMessage(r)
 	return convert, count, nil
+}
+
+func (me *T) QueryAggregate(args struct {
+	Collection string
+	Index      string
+	Sort       bson.M
+	Filter     bson.M
+	Pipeline   []bson.M
+	Query      []string
+}, ret *json.RawMessage) ([]map[string]interface{}, error) {
+
+	var results []map[string]interface{}
+	convert := make([]map[string]interface{}, 0)
+	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
+	op := options.AggregateOptions{}
+	op.SetAllowDiskUse(true)
+
+	cursor, err := collection.Aggregate(context.TODO(), args.Pipeline, &op)
+
+	defer func(cursor *mongo.Cursor, ctx context.Context) {
+		err := cursor.Close(ctx)
+		if err != nil {
+			log2.Fatalf("Closing cursor error %v", err)
+		}
+	}(cursor, context.TODO())
+	if err == mongo.ErrNoDocuments {
+		return nil, fmt.Errorf("document not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(context.TODO(), &results); err != nil {
+		return nil, fmt.Errorf("find documents error:%s", err)
+	}
+
+	for _, item := range results {
+		if len(args.Query) == 0 {
+			convert = append(convert, item)
+		} else {
+			temp := make(map[string]interface{})
+			for _, v := range args.Query {
+				temp[v] = item[v]
+			}
+			convert = append(convert, temp)
+		}
+	}
+
+	r, err := json.Marshal(convert)
+	if err != nil {
+		return nil, err
+	}
+	*ret = json.RawMessage(r)
+	return convert, nil
 }
 
 func (me *T) GetDistinctCount(args struct {
