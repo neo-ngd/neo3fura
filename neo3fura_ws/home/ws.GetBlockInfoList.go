@@ -3,14 +3,15 @@ package home
 import (
 	"context"
 	"encoding/json"
+	"log"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
 )
 
 // Block
 func (me *T) GetBlockInfoList(ch *chan map[string]interface{}) error {
-	blockInfoList, err := me.getBlockInfoList()
+	blockInfoList, err := me.getBlockInfoList2()
 	if err != nil {
 		return err
 	}
@@ -32,7 +33,7 @@ func (me *T) GetBlockInfoList(ch *chan map[string]interface{}) error {
 			log.Fatal(err)
 		}
 
-		newBlockInfoList, err := me.getBlockInfoList()
+		newBlockInfoList, err := me.getBlockInfoList2()
 		if err != nil {
 			return err
 		}
@@ -94,5 +95,48 @@ func (me T) getBlockInfoList() (map[string]interface{}, error) {
 		r2 = append(r2, item)
 	}
 	res["BlockInfoList"] = r2
+	return res, nil
+}
+
+func (me T) getBlockInfoList2() (map[string]interface{}, error) {
+	message := make(json.RawMessage, 0)
+	ret := &message
+	res := make(map[string]interface{})
+	r1, err := me.Client.QueryAggregate(
+		struct {
+			Collection string
+			Index      string
+			Sort       bson.M
+			Filter     bson.M
+			Pipeline   []bson.M
+			Query      []string
+		}{Collection: "Block",
+			Index:  "GetBlockInfoList",
+			Sort:   bson.M{},
+			Filter: bson.M{},
+			Pipeline: []bson.M{
+				bson.M{"$sort": bson.M{"_id": -1}},
+				bson.M{"$lookup": bson.M{
+					"from": "Transaction",
+					"let":  bson.M{"blockhash": "$hash"},
+					"pipeline": []bson.M{
+						bson.M{"$match": bson.M{"$expr": bson.M{"$and": []interface{}{
+							bson.M{"$eq": []interface{}{"$blockhash", "$$blockhash"}},
+						}}}},
+					},
+					"as": "info"},
+				},
+
+				bson.M{"$project": bson.M{"_id": 1, "index": 1, "size": 1, "timestamp": 1, "hash": 1, "transactioncount": bson.M{"$size": "$info"}}},
+				bson.M{"$limit": 10},
+			},
+			Query: []string{}}, ret)
+
+	if err != nil {
+		return nil, err
+	}
+
+	res["BlockInfoList"] = r1
+
 	return res, nil
 }
