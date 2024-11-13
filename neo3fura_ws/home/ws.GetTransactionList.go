@@ -3,14 +3,15 @@ package home
 import (
 	"context"
 	"encoding/json"
+	"log"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
 )
 
 // TransactionList
 func (me *T) GetTransactionList(ch *chan map[string]interface{}) error {
-	transactionList, err := me.getTransactionList()
+	transactionList, err := me.getTransactionList2()
 	if err != nil {
 		return err
 	}
@@ -31,7 +32,7 @@ func (me *T) GetTransactionList(ch *chan map[string]interface{}) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		newTransactionList, err := me.getTransactionList()
+		newTransactionList, err := me.getTransactionList2()
 		if err != nil {
 			return err
 		}
@@ -64,6 +65,36 @@ func (me T) getTransactionList() (map[string]interface{}, error) {
 		Limit:      10,
 		Skip:       0,
 	}, ret)
+	if err != nil {
+		return nil, err
+	}
+	res["TransactionList"] = r1
+	return res, nil
+}
+
+func (me T) getTransactionList2() (map[string]interface{}, error) {
+	message := make(json.RawMessage, 0)
+	ret := &message
+	res := make(map[string]interface{})
+	r1, err := me.Client.QueryAggregate(
+		struct {
+			Collection string
+			Index      string
+			Sort       bson.M
+			Filter     bson.M
+			Pipeline   []bson.M
+			Query      []string
+		}{Collection: "Transaction",
+			Index:  "GetTransactionList",
+			Sort:   bson.M{},
+			Filter: bson.M{},
+			Pipeline: []bson.M{
+				bson.M{"$sort": bson.M{"blocktime": -1}},
+				bson.M{"$project": bson.M{"_id": 1, "size": 1, "blocktime": 1, "hash": 1, "sysfee": 1, "netfee": 1}},
+				bson.M{"$limit": 10},
+			},
+			Query: []string{}}, ret)
+
 	if err != nil {
 		return nil, err
 	}

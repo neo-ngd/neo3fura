@@ -3,14 +3,15 @@ package home
 import (
 	"context"
 	"encoding/json"
+	"log"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
 )
 
 // Address
 func (me *T) GetTransactionCount(ch *chan map[string]interface{}) error {
-	transactionCount, err := me.getTransactionCount()
+	transactionCount, err := me.getTransactionCount2()
 	if err != nil {
 		return err
 	}
@@ -31,7 +32,7 @@ func (me *T) GetTransactionCount(ch *chan map[string]interface{}) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		newTransactionCount, err := me.getTransactionCount()
+		newTransactionCount, err := me.getTransactionCount2()
 		if err != nil {
 			return err
 		}
@@ -62,5 +63,34 @@ func (me T) getTransactionCount() (map[string]interface{}, error) {
 		return nil, err
 	}
 	res["TransactionCount"] = r1
+	return res, nil
+}
+
+func (me T) getTransactionCount2() (map[string]interface{}, error) {
+	message := make(json.RawMessage, 0)
+	ret := &message
+	res := make(map[string]interface{})
+	r1, err := me.Client.QueryAggregate(
+		struct {
+			Collection string
+			Index      string
+			Sort       bson.M
+			Filter     bson.M
+			Pipeline   []bson.M
+			Query      []string
+		}{Collection: "Transaction",
+			Index:  "GetTransactionList",
+			Sort:   bson.M{},
+			Filter: bson.M{},
+			Pipeline: []bson.M{
+				bson.M{"$group": bson.M{"_id": "$_id"}},
+				bson.M{"$count": "total counts"},
+			},
+			Query: []string{}}, ret)
+
+	if err != nil {
+		return nil, err
+	}
+	res["TransactionCount"] = r1[0]
 	return res, nil
 }
