@@ -160,4 +160,7 @@ var Apis = []string{
 	"GetMarketCollectionWhitelist",
 	"GetRedEnvelopeUsers",
 	"GetBridgeTxByNonce",
+	"GetHoldersByContractHash",
+	"GetWithdrawalCount",
+	"GetBridgeWithdrawHistory",
 }
