@@ -2,9 +2,11 @@ package h160
 
 import (
 	"encoding/hex"
+	"regexp"
+	"strings"
+
 	"github.com/joeqian10/neo3-gogogo/crypto"
 	"github.com/joeqian10/neo3-gogogo/helper"
-	"regexp"
 )
 
 // T ...
@@ -33,7 +35,7 @@ func (me T) Valid1() bool {
 
 // Val ...
 func (me T) Val() string {
-	return string(me)
+	return strings.ToLower(string(me))
 }
 
 // TransferredVal
