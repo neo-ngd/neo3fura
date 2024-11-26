@@ -57,7 +57,7 @@ func (me *T) GetBridgeWithdrawHistory(args struct {
 	}{
 		Collection: "Notification",
 		Index:      "GetBridgeWithdrawHistory",
-		Sort:       bson.M{"_id": -1},
+		Sort:       bson.M{"timestamp": -1},
 		Filter:     filter,
 		Query:      []string{},
 		Limit:      args.Limit,
