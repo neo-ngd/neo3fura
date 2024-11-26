@@ -162,5 +162,5 @@ var Apis = []string{
 	"GetBridgeTxByNonce",
 	"GetHoldersByContractHash",
 	"GetWithdrawalCount",
-	"GetBridgeWithdrawHistory",
+	"GetBridgeDepositHistory",
 }
