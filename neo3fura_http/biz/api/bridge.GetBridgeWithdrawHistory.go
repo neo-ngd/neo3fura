@@ -21,7 +21,7 @@ import (
 	"neo3fura_http/var/stderr"
 )
 
-func (me *T) GetBridgeWithdrawHistory(args struct {
+func (me *T) GetBridgeDepositHistory(args struct {
 	ContractHash h160.T
 	Sender       h160.T
 	Limit        int64
@@ -56,7 +56,7 @@ func (me *T) GetBridgeWithdrawHistory(args struct {
 		Skip       int64
 	}{
 		Collection: "Notification",
-		Index:      "GetBridgeWithdrawHistory",
+		Index:      "GetBridgeDepositHistory",
 		Sort:       bson.M{"timestamp": -1},
 		Filter:     filter,
 		Query:      []string{},
