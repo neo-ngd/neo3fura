@@ -163,4 +163,5 @@ var Apis = []string{
 	"GetHoldersByContractHash",
 	"GetWithdrawalCount",
 	"GetBridgeDepositHistory",
+	"GetTransferTxByAddressAsset",
 }
