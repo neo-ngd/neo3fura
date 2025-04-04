@@ -2,6 +2,8 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"math/big"
 
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -10,33 +12,24 @@ import (
 
 func (me *T) GetTransferTxByAddressAsset(args struct {
 	FromAddress h160.T
-	ToAddress   h160.T
-	Asset       h160.T
-	StartTime   uint64
-	EndTime     uint64
-	Limit       int64
-	Skip        int64
-	Filter      map[string]interface{}
+	//	ToAddress   h160.T
+	//Asset       h160.T
+	//StartTime uint64
+	//EndTime   uint64
+	Limit  int64
+	Skip   int64
+	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
 	f := bson.M{}
-	if args.FromAddress.Valid() {
-		f["from"] = args.FromAddress.Val()
+	if !args.FromAddress.Valid() {
+		return errors.New("invalid fromAddress")
 	}
-	if args.ToAddress.Valid() {
-		f["to"] = args.ToAddress.Val()
-	}
+	f["from"] = args.FromAddress.Val()
+	f["to"] = "0x472c36c9e51bc7d3906e48182c2213539a4728d5"
+	f["contract"] = "0xef4073a0f2b305a38ec4050e4d3d28bc40ea63f5"
 
-	if args.Asset.Valid() {
-		f["contract"] = args.Asset.Val()
-	}
+	f["timestamp"] = bson.M{"$gte": big.NewInt(1743825600000), "$lte": big.NewInt(1744430400000)}
 
-	if args.StartTime <= args.EndTime && args.EndTime > 0 {
-		f["timestamp"] = bson.M{"$gte": args.StartTime, "$lte": args.EndTime}
-	}
-
-	if args.Limit == 0 {
-		args.Limit = 512
-	}
 	r1, count, err1 := me.Client.QueryAll(struct {
 		Collection string
 		Index      string
@@ -50,7 +43,7 @@ func (me *T) GetTransferTxByAddressAsset(args struct {
 		Index:      "TransferNotification",
 		Sort:       bson.M{},
 		Filter:     f,
-		Query:      []string{},
+		Query:      []string{"from", "to", "value", "timestamp", "txid"},
 	}, ret)
 	if err1 != nil {
 		return err1
