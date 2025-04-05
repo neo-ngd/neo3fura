@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"math/big"
 
 	"go.mongodb.org/mongo-driver/bson"
 
@@ -28,7 +27,10 @@ func (me *T) GetTransferTxByAddressAsset(args struct {
 	f["to"] = "0x472c36c9e51bc7d3906e48182c2213539a4728d5"
 	f["contract"] = "0xef4073a0f2b305a38ec4050e4d3d28bc40ea63f5"
 
-	f["timestamp"] = bson.M{"$gte": big.NewInt(1743825600000), "$lte": big.NewInt(1744430400000)}
+	f["$and"] = []interface{}{
+		bson.M{"timestamp": bson.M{"$gte": 1743825600000}},
+		bson.M{"timestamp": bson.M{"$lte": 1744430400000}},
+	}
 
 	r1, count, err1 := me.Client.QueryAll(struct {
 		Collection string
