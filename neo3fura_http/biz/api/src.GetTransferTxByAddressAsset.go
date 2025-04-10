@@ -46,6 +46,8 @@ func (me *T) GetTransferTxByAddressAsset(args struct {
 		Sort:       bson.M{},
 		Filter:     f,
 		Query:      []string{"from", "to", "value", "timestamp", "txid"},
+		Limit:      args.Limit,
+		Skip:       args.Skip,
 	}, ret)
 	if err1 != nil {
 		return err1
