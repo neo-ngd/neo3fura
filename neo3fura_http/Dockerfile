@@ -2,7 +2,7 @@ FROM golang:1.21
 
 ENV GO111MODULE="on"
 
-ENV GOPROXY="https://goproxy.io"
+ENV GOPROXY="https://goproxy.cn,direct"
 
 ARG RT
 
