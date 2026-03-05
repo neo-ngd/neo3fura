@@ -29,11 +29,21 @@ func (me *T) GetContractList(args struct {
 			Sort:       bson.M{},
 			Filter:     bson.M{},
 			Pipeline: []bson.M{
+				bson.M{"$addFields": bson.M{
+					"createtimeLong": bson.M{
+						"$convert": bson.M{
+							"input":   "$createtime",
+							"to":      "long",
+							"onError": int64(0),
+							"onNull":  int64(0),
+						},
+					},
+				}},
 				bson.M{"$sort": bson.M{"hash": 1, "updatecounter": -1, "_id": -1}},
 				bson.M{"$group": bson.M{"_id": "$hash",
 					"hash":          bson.M{"$first": "$hash"},
 					"updatecounter": bson.M{"$first": "$updatecounter"},
-					"createtime":    bson.M{"$first": "$createtime"},
+					"createtime":    bson.M{"$min": "$createtimeLong"},
 					"name":          bson.M{"$first": "$name"},
 					"id":            bson.M{"$first": "$id"},
 					"createTxid":    bson.M{"$first": "$createTxid"},
