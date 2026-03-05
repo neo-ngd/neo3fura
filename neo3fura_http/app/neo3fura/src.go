@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"gopkg.in/yaml.v2"
 	"neo3fura_http/biz/api"
 	"neo3fura_http/biz/job"
 	"neo3fura_http/biz/watch"
@@ -17,8 +14,11 @@ import (
 	"net/rpc"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"gopkg.in/yaml.v2"
 
 	"github.com/go-redis/redis/v8"
 	neoRpc "github.com/joeqian10/neo3-gogogo/rpc"
@@ -219,7 +219,7 @@ func main() {
 }
 
 func initializeMongoOnlineClient(cfg Config, ctx context.Context) (*mongo.Client, string) {
-	rt := strings.ToLower(strings.TrimSpace(os.Getenv("RUNTIME")))
+	rt := os.ExpandEnv("${RUNTIME}")
 	var clientOptions *options.ClientOptions
 	var dbOnline string
 	switch rt {
@@ -256,7 +256,7 @@ func initializeMongoOnlineClient(cfg Config, ctx context.Context) (*mongo.Client
 	return co, dbOnline
 }
 func initializeNeoFsHost(cfg Config) string {
-	rt := strings.ToLower(strings.TrimSpace(os.Getenv("RUNTIME")))
+	rt := os.ExpandEnv("${RUNTIME}")
 	var neoFsHost string
 	switch rt {
 	case "test":
