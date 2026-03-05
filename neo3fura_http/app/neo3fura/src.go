@@ -17,6 +17,7 @@ import (
 	"net/rpc"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -218,7 +219,7 @@ func main() {
 }
 
 func initializeMongoOnlineClient(cfg Config, ctx context.Context) (*mongo.Client, string) {
-	rt := os.ExpandEnv("${RUNTIME}")
+	rt := strings.ToLower(strings.TrimSpace(os.Getenv("RUNTIME")))
 	var clientOptions *options.ClientOptions
 	var dbOnline string
 	switch rt {
@@ -235,7 +236,12 @@ func initializeMongoOnlineClient(cfg Config, ctx context.Context) (*mongo.Client
 		clientOptions = options.Client().ApplyURI("mongodb://" + cfg.Database_Staging.User + ":" + cfg.Database_Staging.Pass + "@" + cfg.Database_Staging.Host + ":" + cfg.Database_Staging.Port + "/" + cfg.Database_Staging.Database)
 		dbOnline = cfg.Database_Staging.Database
 	default:
-		log2.Fatalf("runtime environment mismatch")
+		log2.Fatalf("runtime environment mismatch: RUNTIME=%s (expected: dev/test/test2/staging)", rt)
+		os.Exit(1)
+	}
+	if clientOptions == nil {
+		log2.Fatalf("mongo client options is nil, RUNTIME=%s", rt)
+		os.Exit(1)
 	}
 
 	clientOptions.SetMaxPoolSize(50)
@@ -250,7 +256,7 @@ func initializeMongoOnlineClient(cfg Config, ctx context.Context) (*mongo.Client
 	return co, dbOnline
 }
 func initializeNeoFsHost(cfg Config) string {
-	rt := os.ExpandEnv("${RUNTIME}")
+	rt := strings.ToLower(strings.TrimSpace(os.Getenv("RUNTIME")))
 	var neoFsHost string
 	switch rt {
 	case "test":
@@ -258,7 +264,8 @@ func initializeNeoFsHost(cfg Config) string {
 	case "staging":
 		neoFsHost = cfg.NeoFs_Main.Host + ":" + cfg.NeoFs_Main.Port + "/gate" + "/get/" + cfg.NeoFs_Main.ContainerId + "/"
 	default:
-		log2.Fatalf("runtime environment mismatch")
+		log2.Fatalf("runtime environment mismatch: RUNTIME=%s (expected: test/staging)", rt)
+		os.Exit(1)
 	}
 	return neoFsHost
 }
