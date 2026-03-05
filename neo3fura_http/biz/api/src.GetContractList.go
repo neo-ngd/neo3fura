@@ -11,6 +11,9 @@ func (me *T) GetContractList(args struct {
 	Limit  int64
 	Skip   int64
 }, ret *json.RawMessage) error {
+	if args.Limit == 0 {
+		args.Limit = 512
+	}
 
 	var r1, err = me.Client.QueryAggregate(
 		struct {
@@ -26,16 +29,17 @@ func (me *T) GetContractList(args struct {
 			Sort:       bson.M{},
 			Filter:     bson.M{},
 			Pipeline: []bson.M{
+				bson.M{"$sort": bson.M{"hash": 1, "updatecounter": -1, "_id": -1}},
 				bson.M{"$group": bson.M{"_id": "$hash",
-					"hash":          bson.M{"$last": "$hash"},
-					"updatecounter": bson.M{"$last": "$updatecounter"},
-					"createtime":    bson.M{"$last": "$createtime"},
-					"name":          bson.M{"$last": "$name"},
-					"id":            bson.M{"$last": "$id"},
-					"createTxid":    bson.M{"$last": "$createTxid"},
+					"hash":          bson.M{"$first": "$hash"},
+					"updatecounter": bson.M{"$first": "$updatecounter"},
+					"createtime":    bson.M{"$first": "$createtime"},
+					"name":          bson.M{"$first": "$name"},
+					"id":            bson.M{"$first": "$id"},
+					"createTxid":    bson.M{"$first": "$createTxid"},
 				},
 				},
-				bson.M{"$sort": bson.M{"id": 1}},
+				bson.M{"$sort": bson.M{"createtime": -1, "id": 1, "hash": 1}},
 				bson.M{"$skip": args.Skip},
 				bson.M{"$limit": args.Limit},
 				bson.M{"$lookup": bson.M{
