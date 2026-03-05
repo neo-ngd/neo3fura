@@ -25,19 +25,19 @@ RUN  rm packages-microsoft-prod.deb
 RUN  apt-get clean && \
      apt-get update
 
-RUN  wget  http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb && \
-     dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
+#RUN  wget  http://archive.ubuntu.com/ubuntu/pool/main/o/openssl/libssl1.1_1.1.1f-1ubuntu2_amd64.deb && \
+ #    dpkg -i libssl1.1_1.1.1f-1ubuntu2_amd64.deb
 
-RUN  apt-get install -y apt-transport-https
+#RUN  apt-get install -y apt-transport-https
 
-RUN  apt-get install -y dotnet-sdk-5.0 && \
-     apt-get install -y aspnetcore-runtime-5.0
+#RUN  apt-get install -y dotnet-sdk-5.0 && \
+#     apt-get install -y aspnetcore-runtime-5.0
 
-RUN  tar -xvf compiler.tar.gz
+#RUN  tar -xvf compiler.tar.gz
 
-RUN  chmod 777 compiler/a/nccs && \
-     chmod 777 compiler/c/nccs && \
-     chmod 777 compiler/b/nccs
+#RUN  chmod 777 compiler/a/nccs && \
+#     chmod 777 compiler/c/nccs && \
+#     chmod 777 compiler/b/nccs
 
 RUN  go build -o main app/neo3fura/src.go
 
