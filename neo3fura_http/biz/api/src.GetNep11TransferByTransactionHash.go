@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"neo3fura_http/lib/type/h256"
 	"neo3fura_http/var/stderr"
 
@@ -57,7 +58,7 @@ func (me *T) GetNep11TransferByTransactionHash(args struct {
 			item["decimals"] = r["decimals"]
 			item["symbol"] = r["symbol"]
 
-		} else if err.Error() == "NOT FOUND" {
+		} else if errors.Is(err, stderr.ErrNotFound) {
 			item["tokenname"] = ""
 			item["decimals"] = ""
 			item["symbol"] = ""

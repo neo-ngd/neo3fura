@@ -548,17 +548,25 @@ func (me *T) GetNFTOwnedByAddress(args struct {
 			}
 		}
 
-		//添加绑定 owner 的nns
-		owner := item["owner"].(string)
-		var owner_nns, owner_userName string
-		if owner != "" {
-			owner_nns, owner_userName, err = GetNNSByAddress(owner)
-			if err != nil {
-				return err
-			}
+	}
+
+	// Batch fetch NNS data for all owners concurrently
+	ownerAddrs := make([]string, 0, len(r1))
+	for _, item := range r1 {
+		if owner, ok := item["owner"].(string); ok && owner != "" {
+			ownerAddrs = append(ownerAddrs, owner)
 		}
-		item["nns"] = owner_nns
-		item["userName"] = owner_userName
+	}
+	nnsResults := GetNNSByAddresses(ownerAddrs)
+	for _, item := range r1 {
+		owner, _ := item["owner"].(string)
+		if res, ok := nnsResults[owner]; ok && res.Err == nil {
+			item["nns"] = res.NNS
+			item["userName"] = res.UserName
+		} else {
+			item["nns"] = ""
+			item["userName"] = ""
+		}
 	}
 
 	// 按上架时间排序

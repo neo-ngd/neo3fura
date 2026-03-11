@@ -46,11 +46,10 @@ func (me *T) GetRedEnvelopeUsers(args struct {
 		NetEndPoint = "http://seed2.neo.org:10332"
 		nnsContract = Contract.Main_NNS
 	default:
-		log2.Fatalf("runtime environment mismatch")
+		log2.Errorf("runtime environment mismatch")
+		return stderr.ErrUnknown
 	}
 
-	flag, err := isExpiresNNS(NetEndPoint, nnsContract, "Y3J5cHRvem9tYmllLm5lbw==")
-	fmt.Println(flag, err)
 	r1, err := me.Client.QueryAggregate(struct {
 		Collection string
 		Index      string

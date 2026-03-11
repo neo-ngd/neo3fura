@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math"
@@ -119,7 +118,6 @@ func (me *T) GetMarketOrdersByPrice(args struct {
 		if max.Cmp(minPrice) != -1 && min.Cmp(max) != 1 {
 			minindex := FindIndexLeft(r5, "usdAmount", minPrice)  // ->
 			maxindex := FindIndexRight(r5, "usdAmount", maxPrice) // <-
-			fmt.Println(minPrice, maxPrice, minindex, maxindex)
 			result = r5[minindex+1 : maxindex]
 		}
 

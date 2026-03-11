@@ -13,7 +13,8 @@ func (me T) GetMarketSupply() {
 
 	assetList, err2 := me.GetNep11Asset()
 	if err2 != nil {
-		log2.Fatal("GetMarketNep11Asset err")
+		log2.Errorf("GetMarketNep11Asset err: %v", err2)
+		return
 	}
 
 	result := make(map[string]interface{})
@@ -41,7 +42,8 @@ func (me T) GetMarketSupply() {
 			}, ret)
 
 		if err != nil {
-			log2.Fatal("GetMarketNftCount err")
+			log2.Errorf("GetMarketNftCount err: %v", err)
+			continue
 		}
 
 		if len(r1) > 0 {
@@ -57,7 +59,8 @@ func (me T) GetMarketSupply() {
 			Filter     bson.M
 		}{Collection: "MarketIndex", Data: result, Filter: bson.M{"asset": it}})
 		if err != nil {
-			log2.Fatal("MarketIndex update err")
+			log2.Errorf("MarketIndex update err: %v", err)
+			continue
 		}
 
 	}

@@ -3,7 +3,7 @@ package home
 import (
 	"context"
 	"encoding/json"
-	"log"
+	log2 "neo3fura_ws/lib/log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,23 +25,27 @@ func (me *T) GetTransactionCount(ch *chan map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer cs.Close(context.TODO())
 	// Whenever there is a new change event, decode the change event and print some information about it
 	for cs.Next(context.TODO()) {
 		var changeEvent map[string]interface{}
 		err := cs.Decode(&changeEvent)
 		if err != nil {
-			log.Fatal(err)
+			log2.Errorf("GetTransactionCount decode change event failed: %v", err)
+			continue
 		}
 		newTransactionCount, err := me.getTransactionCount2()
 		if err != nil {
 			return err
 		}
-		if transactionCount["TransactionCount"].(map[string]interface{})["total counts"] != newTransactionCount["TransactionCount"].(map[string]interface{})["total counts"] {
+		oldTotal, okOld := extractTotalCounts(transactionCount["TransactionCount"])
+		newTotal, okNew := extractTotalCounts(newTransactionCount["TransactionCount"])
+		if !okOld || !okNew || oldTotal != newTotal {
 			*ch <- newTransactionCount
 			transactionCount = newTransactionCount
 		}
 	}
-	return nil
+	return cs.Err()
 }
 
 func (me T) getTransactionCount() (map[string]interface{}, error) {
@@ -90,6 +94,10 @@ func (me T) getTransactionCount2() (map[string]interface{}, error) {
 
 	if err != nil {
 		return nil, err
+	}
+	if len(r1) == 0 {
+		res["TransactionCount"] = map[string]interface{}{"total counts": int64(0)}
+		return res, nil
 	}
 	res["TransactionCount"] = r1[0]
 	return res, nil

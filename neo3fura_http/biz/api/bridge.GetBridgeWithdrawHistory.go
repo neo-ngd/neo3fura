@@ -7,7 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/big"
-	"net/http"
+	"neo3fura_http/lib/httpx"
 	"os"
 	"strings"
 
@@ -229,7 +229,7 @@ func getDepositTxFromNeox(tokenHash string, nonceStr string) (string, string, er
 		urlStr = url + tokenHash + "/" + nonceStr
 	}
 
-	resp, err := http.Get(urlStr)
+	resp, err := httpx.Get(urlStr)
 	if err != nil {
 		return "", "", err
 	}

@@ -3,7 +3,7 @@ package home
 import (
 	"context"
 	"encoding/json"
-	"log"
+	log2 "neo3fura_ws/lib/log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,23 +25,27 @@ func (me *T) GetTransactionList(ch *chan map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer cs.Close(context.TODO())
 	// Whenever there is a new change event, decode the change event and print some information about it
 	for cs.Next(context.TODO()) {
 		var changeEvent map[string]interface{}
 		err := cs.Decode(&changeEvent)
 		if err != nil {
-			log.Fatal(err)
+			log2.Errorf("GetTransactionList decode change event failed: %v", err)
+			continue
 		}
 		newTransactionList, err := me.getTransactionList2()
 		if err != nil {
 			return err
 		}
-		if transactionList["TransactionList"].([]map[string]interface{})[0]["hash"] == newTransactionList["TransactionList"].([]map[string]interface{})[0]["hash"] {
+		oldHash, okOld := extractFirstHash(transactionList["TransactionList"])
+		newHash, okNew := extractFirstHash(newTransactionList["TransactionList"])
+		if okOld && okNew && oldHash == newHash {
 			*ch <- newTransactionList
 			transactionList = newTransactionList
 		}
 	}
-	return nil
+	return cs.Err()
 }
 
 func (me T) getTransactionList() (map[string]interface{}, error) {

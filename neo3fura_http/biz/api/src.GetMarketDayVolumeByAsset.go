@@ -2,10 +2,8 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
 	"time"
@@ -24,7 +22,6 @@ func (me *T) GetMarketDayVolumeByAsset(args struct {
 
 	ld := newtime.UnixMilli() - lastday
 
-	fmt.Println(ld, time.UnixMilli(ld).Format(consts.ShortForm))
 	if args.AssetHash.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}

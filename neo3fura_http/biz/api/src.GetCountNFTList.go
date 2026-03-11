@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"neo3fura_http/lib/type/Contract"
@@ -181,7 +180,6 @@ func (me *T) GetCountNFTList(args struct {
 	if err4 != nil {
 		return err4
 	}
-	fmt.Println(r2)
 	var count int64
 	var count2 int64
 	result := make(map[string]interface{})

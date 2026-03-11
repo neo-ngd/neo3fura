@@ -8,6 +8,7 @@ import (
 	"github.com/joeqian10/neo3-gogogo/crypto"
 	"github.com/joeqian10/neo3-gogogo/helper"
 	"io/ioutil"
+	"neo3fura_http/lib/httpx"
 	"neo3fura_http/lib/joh"
 	log2 "neo3fura_http/lib/log"
 	"neo3fura_http/lib/type/h160"
@@ -107,9 +108,13 @@ func (me *T) getNep11PropertiesByContract(asset string, tokenid string) (map[str
 	h := &joh.T{}
 	c, err := h.OpenConfigFile()
 	if err != nil {
-		log2.Fatalf("Open config file error:%s", err)
+		log2.Errorf("Open config file error:%s", err)
+		return nil, err
 	}
 	nodes := c.Proxy.URI
+	if len(nodes) == 0 {
+		return nil, stderr.ErrFind
+	}
 	re := make(map[string]interface{})
 
 	for _, item := range nodes {
@@ -119,16 +124,33 @@ func (me *T) getNep11PropertiesByContract(asset string, tokenid string) (map[str
 		}
 		break
 	}
+	if err != nil || len(re) == 0 {
+		return nil, stderr.ErrFind
+	}
 
-	res := re["result"].(map[string]interface{})
-	state := res["state"]
+	res, ok := re["result"].(map[string]interface{})
+	if !ok {
+		return nil, stderr.ErrFind
+	}
+	state, _ := res["state"].(string)
 	exception := res["exception"]
 
 	if state != "HALT" || exception != nil {
 		return nil, stderr.ErrFind
 	}
 
-	result := res["stack"].([]interface{})[0].(map[string]interface{})["value"].([]interface{})
+	stack, ok := res["stack"].([]interface{})
+	if !ok || len(stack) == 0 {
+		return nil, stderr.ErrFind
+	}
+	stackTop, ok := stack[0].(map[string]interface{})
+	if !ok {
+		return nil, stderr.ErrFind
+	}
+	result, ok := stackTop["value"].([]interface{})
+	if !ok {
+		return nil, stderr.ErrFind
+	}
 	properties := make(map[string]interface{})
 	for _, item := range result {
 		it := item.(map[string]interface{})
@@ -245,7 +267,7 @@ func (me *T) getPropertiesByRPC(url string, asset string, tokenid string) (map[s
 
 	jsonData := []byte(para)
 	body := bytes.NewBuffer(jsonData)
-	response, err := http.Post(url, "application/json", body)
+	response, err := httpx.Post(url, "application/json", body)
 	if err != nil {
 		return nil, err
 	}

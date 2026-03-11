@@ -121,11 +121,15 @@ func mainpage(w http.ResponseWriter, r *http.Request) {
 
 	wsc, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log2.Fatalf("upgrade error:%s", err)
+		log2.Errorf("upgrade error:%s", err)
+		http.Error(w, "upgrade failed", http.StatusBadRequest)
+		return
 	}
+	defer wsc.Close()
 	mt, _, err := wsc.ReadMessage()
 	if err != nil {
-		log2.Fatalf("read message error:%s", err)
+		log2.Errorf("read message error:%s", err)
+		return
 	}
 
 	var responseChannel = make(chan map[string]interface{}, 20)
@@ -151,16 +155,22 @@ func bridgepage(w http.ResponseWriter, r *http.Request) {
 
 	nonce, err := strconv.Atoi(nonceStr)
 	if err != nil {
-		log2.Fatalf("Failed to convert string to int:%s", err)
+		log2.Errorf("Failed to convert string to int:%s", err)
+		http.Error(w, "invalid nonce", http.StatusBadRequest)
+		return
 	}
 
 	wsc, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log2.Fatalf("upgrade error:%s", err)
+		log2.Errorf("upgrade error:%s", err)
+		http.Error(w, "upgrade failed", http.StatusBadRequest)
+		return
 	}
+	defer wsc.Close()
 	mt, _, err := wsc.ReadMessage()
 	if err != nil {
-		log2.Fatalf("read message error:%s", err)
+		log2.Errorf("read message error:%s", err)
+		return
 	}
 
 	var responseChannel = make(chan map[string]interface{}, 20)
@@ -173,18 +183,24 @@ func ResponseController(mt int, wsc *websocket.Conn, ch *chan map[string]interfa
 	str := "hello neo3fura"
 	err := wsc.WriteMessage(mt, []byte(str))
 	if err != nil {
-		log2.Fatalf("write hello message error:%s", err)
+		log2.Errorf("write hello message error:%s", err)
+		return
 	}
 	for {
-		b := <-*ch
+		b, ok := <-*ch
+		if !ok {
+			// channel closed, exit goroutine
+			return
+		}
 		sent, err := json.Marshal(b)
 		if err != nil {
-			log2.Fatalf("json marshal error:%s", err)
+			log2.Errorf("json marshal error:%s", err)
+			continue
 		}
 		err = wsc.WriteMessage(mt, sent)
 		if err != nil {
-			log2.Fatalf("write message error:%s", err)
-			break
+			log2.Infof("write message error (client likely disconnected):%s", err)
+			return
 		}
 	}
 }
@@ -209,7 +225,7 @@ func init() {
 }
 
 func main() {
-	go http.HandleFunc("/home", mainpage)
-	go http.HandleFunc("/bridge", bridgepage)
+	http.HandleFunc("/home", mainpage)
+	http.HandleFunc("/bridge", bridgepage)
 	log2.Fatal(http.ListenAndServe(*add, nil))
 }

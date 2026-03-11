@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"neo3fura_http/lib/httpx"
 	log2 "neo3fura_http/lib/log"
 	"neo3fura_http/lib/mapsort"
 	"neo3fura_http/lib/type/OfferState"
@@ -19,7 +20,6 @@ import (
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/strval"
 	"neo3fura_http/var/stderr"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -33,7 +33,14 @@ func (me *T) GetOffersByAddress(args struct {
 	Limit      int64
 	Skip       int64
 	Filter     map[string]interface{}
-}, ret *json.RawMessage) error {
+}, ret *json.RawMessage) (errRet error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log2.Errorf("GetOffersByAddress panic recovered: %v", r)
+			errRet = stderr.ErrData
+		}
+	}()
+
 	currentTime := time.Now().UnixNano() / 1e6
 	if args.Address.Valid() == false {
 		return stderr.ErrInvalidArgs
@@ -149,44 +156,51 @@ func (me *T) GetOffersByAddress(args struct {
 			continue
 		}
 
-		if item["extendData"] != nil {
-			extendData := item["extendData"].(string)
-			if extendData != "" {
-				var data map[string]interface{}
-				if err2 := json.Unmarshal([]byte(extendData), &data); err2 == nil {
-					item["originOwner"] = data["originOwner"]
-					item["offerAsset"] = data["offerAsset"]
-					oa := data["offerAmount"].(string)
-					offerAmount, err := strconv.ParseInt(oa, 10, 64)
-					if err != nil {
-						return err
-					}
-					item["offerAmount"] = offerAmount
-					dl := data["deadline"].(string)
-					deadline, err := strconv.ParseInt(dl, 10, 64)
-					if err != nil {
-						return err
-					}
-					if deadline < currentTime {
-						continue
-					}
-					item["deadline"] = deadline
-
-				} else {
-					return err2
+		if extendData, ok := toString(item["extendData"]); ok && extendData != "" {
+			var data map[string]interface{}
+			if err2 := json.Unmarshal([]byte(extendData), &data); err2 == nil {
+				item["originOwner"] = data["originOwner"]
+				item["offerAsset"] = data["offerAsset"]
+				oa, ok := toString(data["offerAmount"])
+				if !ok {
+					continue
 				}
-
+				offerAmount, err := strconv.ParseInt(oa, 10, 64)
+				if err != nil {
+					return err
+				}
+				item["offerAmount"] = offerAmount
+				dl, ok := toString(data["deadline"])
+				if !ok {
+					continue
+				}
+				deadline, err := strconv.ParseInt(dl, 10, 64)
+				if err != nil {
+					return err
+				}
+				if deadline < currentTime {
+					continue
+				}
+				item["deadline"] = deadline
+			} else {
+				return err2
 			}
 		}
 
 		nftproperties := item["properties"]
 		if nftproperties != nil && nftproperties != "" {
-			pp := nftproperties.(primitive.A)
-			if len(pp) > 0 {
-				it := pp[0].(map[string]interface{})
-				extendData := it["properties"].(string)
-				asset := item["asset"].(string)
-				tokenid := item["tokenid"].(string)
+			pp, ok := toPrimitiveA(nftproperties)
+			if ok && len(pp) > 0 {
+				it, ok := toMap(pp[0])
+				if !ok {
+					continue
+				}
+				extendData, _ := toString(it["properties"])
+				asset, _ := toString(item["asset"])
+				tokenid, _ := toString(item["tokenid"])
+				if asset == "" || tokenid == "" {
+					continue
+				}
 				if extendData != "" {
 					properties := make(map[string]interface{})
 					var data map[string]interface{}
@@ -201,19 +215,29 @@ func (me *T) GetOffersByAddress(args struct {
 						if ok {
 							properties["image"] = image
 							//item["image"] = image
-							item["image"] = ImagUrl(asset, image.(string), "images")
+							if imageStr, ok := toString(image); ok {
+								item["image"] = ImagUrl(asset, imageStr, "images")
+							}
 						} else {
 							item["image"] = ""
 						}
 						thumbnail, ok := data["thumbnail"]
 						if ok {
-							tb, err22 := base64.URLEncoding.DecodeString(thumbnail.(string))
+							thumbnailStr, ok := toString(thumbnail)
+							if !ok {
+								continue
+							}
+							tb, err22 := base64.URLEncoding.DecodeString(thumbnailStr)
 							if err22 != nil {
 								return err22
 							}
 							ss := string(tb[:])
 							if ss == "" {
-								item["thumbnail"] = ImagUrl(item["asset"].(string), item["image"].(string), "thumbnail")
+								itemAsset, ok1 := toString(item["asset"])
+								itemImage, ok2 := toString(item["image"])
+								if ok1 && ok2 {
+									item["thumbnail"] = ImagUrl(itemAsset, itemImage, "thumbnail")
+								}
 							} else {
 								item["thumbnail"] = ImagUrl(asset, string(tb[:]), "thumbnail")
 							}
@@ -223,15 +247,19 @@ func (me *T) GetOffersByAddress(args struct {
 								if image != nil && image != "" {
 									if image == nil {
 										item["thumbnail"] = item["image"]
-									} else {
-										item["thumbnail"] = ImagUrl(asset, image.(string), "thumbnail")
+									} else if imageStr, ok := toString(image); ok {
+										item["thumbnail"] = ImagUrl(asset, imageStr, "thumbnail")
 									}
 								}
 							}
 						}
 						tokenuri, ok := data["tokenURI"]
 						if ok {
-							ppjson, err := GetImgFromTokenURL(tokenurl(tokenuri.(string)), asset, tokenid)
+							tokenuriStr, ok := toString(tokenuri)
+							if !ok {
+								continue
+							}
+							ppjson, err := GetImgFromTokenURL(tokenurl(tokenuriStr), asset, tokenid)
 							if err != nil {
 								return err
 							}
@@ -239,7 +267,10 @@ func (me *T) GetOffersByAddress(args struct {
 								item[key] = value
 								properties[key] = value
 								if key == "image" {
-									img := value.(string)
+									img, ok := toString(value)
+									if !ok {
+										continue
+									}
 									tb := ImagUrl(asset, img, "thumbnail")
 									flag := strings.HasSuffix(tb, ".mp4")
 									if flag {
@@ -273,7 +304,11 @@ func (me *T) GetOffersByAddress(args struct {
 
 		}
 
-		if item["deadline"].(int64) > currentTime {
+		deadline, ok := asInt64(item["deadline"])
+		if !ok {
+			continue
+		}
+		if deadline > currentTime {
 			result = append(result, item)
 		}
 		delete(item, "extendData")
@@ -327,9 +362,15 @@ func (me *T) GetOffersByAddress(args struct {
 		}
 	} else if args.OfferState.Val() == OfferState.Received.Val() {
 		if raw != nil {
-			asset := raw["assetlist"]
-			assetList := asset.([]interface{})
-			marketAsset := raw["result"].([]map[string]interface{})
+			asset, ok := toInterfaceSlice(raw["assetlist"])
+			if !ok {
+				asset = []interface{}{}
+			}
+			assetList := asset
+			marketAsset, ok := toMapSlice(raw["result"])
+			if !ok {
+				marketAsset = []map[string]interface{}{}
+			}
 
 			tokenlist := GetAssetTokenid(marketAsset)
 			tokenidArr := tokenlist["tokenidArr"]
@@ -449,14 +490,17 @@ func (me *T) GetOffersByAddress(args struct {
 				}, ret)
 
 				if len(offer) > 0 {
-					offereventname := offer["eventname"].(string)
+					offereventname, _ := toString(offer["eventname"])
 					if offereventname == "CancelOfferCollection" {
 						continue
 					} else {
-						extendData := item["extendData"].(string)
+						extendData, _ := toString(item["extendData"])
 						var data map[string]interface{}
 						if err1 := json.Unmarshal([]byte(extendData), &data); err1 == nil {
-							count := data["count"].(string)
+							count, ok := toString(data["count"])
+							if !ok {
+								continue
+							}
 							if count == "0" {
 								continue
 							}
@@ -465,194 +509,241 @@ func (me *T) GetOffersByAddress(args struct {
 					}
 				}
 
-				if item["extendData"] != nil {
-					extendData := item["extendData"].(string)
-					if extendData != "" {
-						var data map[string]interface{}
-						if err2 := json.Unmarshal([]byte(extendData), &data); err2 == nil {
-							//item["originOwner"] = data["originOwner"]
-							item["offerAsset"] = data["offerAsset"]
-							oa := data["offerAmount"].(string)
-							offerAmount, err := strconv.ParseInt(oa, 10, 64)
-							if err != nil {
-								return err
-							}
-							if data["count"] != nil {
-								c := data["count"].(string)
-								count, err := strconv.ParseInt(c, 10, 64)
-								if err != nil {
-									return err
-								}
-								item["count"] = count
-							} else {
-								item["count"] = 1
-							}
-							item["offerAmount"] = offerAmount
-							dl := data["deadline"].(string)
-							deadline, err := strconv.ParseInt(dl, 10, 64)
-							if err != nil {
-								return err
-							}
-							item["deadline"] = deadline
-							if deadline < currentTime {
+				if extendData, ok := toString(item["extendData"]); ok && extendData != "" {
+					var data map[string]interface{}
+					if err2 := json.Unmarshal([]byte(extendData), &data); err2 == nil {
+						//item["originOwner"] = data["originOwner"]
+						item["offerAsset"] = data["offerAsset"]
+						oa, ok := toString(data["offerAmount"])
+						if !ok {
+							continue
+						}
+						offerAmount, err := strconv.ParseInt(oa, 10, 64)
+						if err != nil {
+							return err
+						}
+						if data["count"] != nil {
+							c, ok := toString(data["count"])
+							if !ok {
 								continue
 							}
-							//properties
-							if args.OfferState.Val() == OfferState.Received.Val() {
-								if item["properties"] != nil {
-									properties := item["properties"].(primitive.A)
-									for _, ppit := range properties {
-										copyItem := item
-										ppitem := ppit.(map[string]interface{})
-										ppinfo := ppitem["properties"]
-										ppAsset := ppitem["asset"].(string)
-										ppTokenid := ppitem["tokenid"].(string)
-										var ppdata map[string]interface{}
-										copyItem["tokenid"] = ppTokenid
-										//item["asset"] = ppAsset
-										copyItem["properties"] = ppinfo
+							count, err := strconv.ParseInt(c, 10, 64)
+							if err != nil {
+								return err
+							}
+							item["count"] = count
+						} else {
+							item["count"] = 1
+						}
+						item["offerAmount"] = offerAmount
+						dl, ok := toString(data["deadline"])
+						if !ok {
+							continue
+						}
+						deadline, err := strconv.ParseInt(dl, 10, 64)
+						if err != nil {
+							return err
+						}
+						item["deadline"] = deadline
+						if deadline < currentTime {
+							continue
+						}
+						//properties
+						if args.OfferState.Val() == OfferState.Received.Val() {
+							if item["properties"] != nil {
+								properties, ok := toPrimitiveA(item["properties"])
+								if !ok {
+									continue
+								}
+								for _, ppit := range properties {
+									copyItem := item
+									ppitem, ok := toMap(ppit)
+									if !ok {
+										continue
+									}
+									ppinfo := ppitem["properties"]
+									ppAsset, ok := toString(ppitem["asset"])
+									if !ok || ppAsset == "" {
+										continue
+									}
+									ppTokenid, ok := toString(ppitem["tokenid"])
+									if !ok || ppTokenid == "" {
+										continue
+									}
+									var ppdata map[string]interface{}
+									copyItem["tokenid"] = ppTokenid
+									//item["asset"] = ppAsset
+									copyItem["properties"] = ppinfo
 
-										//
+									//
 
-										marketInfo, err := me.Client.QueryOne(struct {
-											Collection string
-											Index      string
-											Sort       bson.M
-											Filter     bson.M
-											Query      []string
-										}{Collection: "Market",
-											Index:  "GetMarketInfo",
-											Sort:   bson.M{},
-											Filter: bson.M{"amount": bson.M{"$gt": 0}, "asset": item["asset"], "tokenid": ppTokenid},
-											Query:  []string{},
-										}, ret)
+									marketInfo, err := me.Client.QueryOne(struct {
+										Collection string
+										Index      string
+										Sort       bson.M
+										Filter     bson.M
+										Query      []string
+									}{Collection: "Market",
+										Index:  "GetMarketInfo",
+										Sort:   bson.M{},
+										Filter: bson.M{"amount": bson.M{"$gt": 0}, "asset": item["asset"], "tokenid": ppTokenid},
+										Query:  []string{},
+									}, ret)
 
-										if err != nil {
-											return stderr.ErrGetNFTInfo
-										}
-										market := marketInfo["market"]
-										owner := marketInfo["owner"]
-										bidder := marketInfo["bidder"]
-										bidAmount := marketInfo["bidAmount"].(primitive.Decimal128).String()
-										ddl := marketInfo["deadline"].(int64)
+									if err != nil {
+										return stderr.ErrGetNFTInfo
+									}
+									market := marketInfo["market"]
+									owner := marketInfo["owner"]
+									bidder := marketInfo["bidder"]
+									bidAmount, ok := asDecimalString(marketInfo["bidAmount"])
+									if !ok {
+										bidAmount = "0"
+									}
+									ddl, ok := asInt64(marketInfo["deadline"])
+									if !ok {
+										continue
+									}
 
-										if market == owner && ddl > currentTime { // 上架未过期
+									if market == owner && ddl > currentTime { // 上架未过期
+										copyItem["originOwner"] = marketInfo["auctor"]
+									} else if market == owner && ddl < currentTime { //上架过期
+										if bidAmount == "0" {
 											copyItem["originOwner"] = marketInfo["auctor"]
-										} else if market == owner && ddl < currentTime { //上架过期
-											if bidAmount == "0" {
-												copyItem["originOwner"] = marketInfo["auctor"]
-											} else {
-												copyItem["originOwner"] = bidder
-											}
-										} else { //未上架
-											copyItem["originOwner"] = owner
+										} else {
+											copyItem["originOwner"] = bidder
 										}
-										//筛选
-										if copyItem["originOwner"].(string) != args.Address.Val() {
+									} else { //未上架
+										copyItem["originOwner"] = owner
+									}
+									//筛选
+									originOwner, ok := toString(copyItem["originOwner"])
+									if !ok || originOwner != args.Address.Val() {
+										continue
+									}
+									//properties
+									if ppinfo != nil {
+										ppinfoStr, ok := toString(ppinfo)
+										if !ok {
 											continue
 										}
-										//properties
-										if ppinfo != nil {
-											if err1 := json.Unmarshal([]byte(ppinfo.(string)), &ppdata); err1 == nil {
-												name, ok := ppdata["name"]
-												if ok {
-													copyItem["name"] = name
-												} else {
-													copyItem["name"] = ""
-												}
-												image, ok := ppdata["image"]
-												if ok {
-
-													copyItem["image"] = ImagUrl(ppAsset, image.(string), "images")
-												} else {
-													copyItem["image"] = ""
-												}
-												thumbnail, ok := ppdata["thumbnail"]
-												if ok {
-													tb, err22 := base64.URLEncoding.DecodeString(thumbnail.(string))
-													if err22 != nil {
-														return err22
-													}
-													//item["image"] = string(tb[:])
-													copyItem["thumbnail"] = ImagUrl(ppAsset, string(tb[:]), "thumbnail")
-												} else {
-													if copyItem["thumbnail"] == nil {
-														if image != nil && image != "" {
-															if image == nil {
-																copyItem["thumbnail"] = item["image"]
-															} else {
-																copyItem["thumbnail"] = ImagUrl(ppAsset, image.(string), "thumbnail")
-															}
-														}
-													}
-												}
-												tokenuri, ok := ppdata["tokenURI"]
-												if ok {
-													ppjson, err := GetImgFromTokenURL(tokenurl(tokenuri.(string)), ppAsset, ppTokenid)
-													if err != nil {
-														return err
-													}
-													for key, value := range ppjson {
-														copyItem[key] = value
-
-														if key == "image" {
-															img := value.(string)
-															tb := ImagUrl(ppAsset, img, "thumbnail")
-															flag := strings.HasSuffix(tb, ".mp4")
-															if flag {
-																tb = strings.Replace(tb, ".mp4", "mp4", -1)
-															}
-															copyItem["thumbnail"] = tb
-															copyItem["image"] = ImagUrl(ppAsset, img, "images")
-														}
-														if key == "name" {
-															copyItem["name"] = value
-														}
-													}
-												}
-												if copyItem["name"] != nil && copyItem["name"].(string) == "Nuanced Floral Symphony" {
-													copyItem["video"] = copyItem["image"]
-													delete(copyItem, "image")
-												}
-												if copyItem["name"] != nil && copyItem["name"].(string) == "Virtual Visions #1" {
-													copyItem["video"] = copyItem["image"]
-													delete(copyItem, "image")
-												}
-
+										if err1 := json.Unmarshal([]byte(ppinfoStr), &ppdata); err1 == nil {
+											name, ok := ppdata["name"]
+											if ok {
+												copyItem["name"] = name
 											} else {
-												return err
+												copyItem["name"] = ""
 											}
+											image, ok := ppdata["image"]
+											if ok {
+												if imageStr, ok := toString(image); ok {
+													copyItem["image"] = ImagUrl(ppAsset, imageStr, "images")
+												}
+											} else {
+												copyItem["image"] = ""
+											}
+											thumbnail, ok := ppdata["thumbnail"]
+											if ok {
+												thumbnailStr, ok := toString(thumbnail)
+												if !ok {
+													continue
+												}
+												tb, err22 := base64.URLEncoding.DecodeString(thumbnailStr)
+												if err22 != nil {
+													return err22
+												}
+												//item["image"] = string(tb[:])
+												copyItem["thumbnail"] = ImagUrl(ppAsset, string(tb[:]), "thumbnail")
+											} else {
+												if copyItem["thumbnail"] == nil {
+													if image != nil && image != "" {
+														if image == nil {
+															copyItem["thumbnail"] = item["image"]
+														} else if imageStr, ok := toString(image); ok {
+															copyItem["thumbnail"] = ImagUrl(ppAsset, imageStr, "thumbnail")
+														}
+													}
+												}
+											}
+											tokenuri, ok := ppdata["tokenURI"]
+											if ok {
+												tokenuriStr, ok := toString(tokenuri)
+												if !ok {
+													continue
+												}
+												ppjson, err := GetImgFromTokenURL(tokenurl(tokenuriStr), ppAsset, ppTokenid)
+												if err != nil {
+													return err
+												}
+												for key, value := range ppjson {
+													copyItem[key] = value
+
+													if key == "image" {
+														img, ok := toString(value)
+														if !ok {
+															continue
+														}
+														tb := ImagUrl(ppAsset, img, "thumbnail")
+														flag := strings.HasSuffix(tb, ".mp4")
+														if flag {
+															tb = strings.Replace(tb, ".mp4", "mp4", -1)
+														}
+														copyItem["thumbnail"] = tb
+														copyItem["image"] = ImagUrl(ppAsset, img, "images")
+													}
+													if key == "name" {
+														copyItem["name"] = value
+													}
+												}
+											}
+											nameVal, ok := toString(copyItem["name"])
+											if ok && nameVal == "Nuanced Floral Symphony" {
+												copyItem["video"] = copyItem["image"]
+												delete(copyItem, "image")
+											}
+											if ok && nameVal == "Virtual Visions #1" {
+												copyItem["video"] = copyItem["image"]
+												delete(copyItem, "image")
+											}
+
+										} else {
+											return err
 										}
-
-										delete(copyItem, "extendData")
-										delete(copyItem, "properties")
-
-										re := make(map[string]interface{})
-										re = CopyMap(re, copyItem)
-										result = append(result, re)
-
 									}
-								}
 
-							} else if args.OfferState.Val() == OfferState.Valid.Val() {
-								if item["assetInfo"] != nil {
-									assetInfo := item["assetInfo"].(primitive.A)
-									info := assetInfo[0].(map[string]interface{})
-									item["name"] = info["tokenname"]
-									item["image"] = ""
-									item["thumbnail"] = ""
-									item["originOwner"] = ""
-									delete(item, "assetInfo")
-									delete(item, "extendData")
+									delete(copyItem, "extendData")
+									delete(copyItem, "properties")
 
-									result = append(result, item)
+									re := make(map[string]interface{})
+									re = CopyMap(re, copyItem)
+									result = append(result, re)
+
 								}
 							}
 
-						} else {
-							return err2
+						} else if args.OfferState.Val() == OfferState.Valid.Val() {
+							if item["assetInfo"] != nil {
+								assetInfo, ok := toPrimitiveA(item["assetInfo"])
+								if !ok || len(assetInfo) == 0 {
+									continue
+								}
+								info, ok := toMap(assetInfo[0])
+								if !ok {
+									continue
+								}
+								item["name"] = info["tokenname"]
+								item["image"] = ""
+								item["thumbnail"] = ""
+								item["originOwner"] = ""
+								delete(item, "assetInfo")
+								delete(item, "extendData")
+
+								result = append(result, item)
+							}
 						}
 
+					} else {
+						return err2
 					}
 				}
 
@@ -701,19 +792,87 @@ func GetAssetTokenid(mapArr []map[string]interface{}) map[string]interface{} {
 	var tokenidArr []interface{}
 	if len(mapArr) > 0 {
 		for _, item := range mapArr {
-			asset := item["asset"].(string)
-			marketArr := item["marketAsset"].(primitive.A)
+			asset, ok := toString(item["asset"])
+			if !ok || asset == "" {
+				continue
+			}
+			marketArr, ok := toPrimitiveA(item["marketAsset"])
+			if !ok {
+				continue
+			}
 			tokenidList := []interface{}{}
 			for _, it := range marketArr {
-				i := it.(map[string]interface{})
-				tokenidList = append(tokenidList, i["tokenid"].(string))
-				tokenidArr = append(tokenidArr, i["tokenid"].(string))
+				i, ok := toMap(it)
+				if !ok {
+					continue
+				}
+				tokenid, ok := toString(i["tokenid"])
+				if !ok || tokenid == "" {
+					continue
+				}
+				tokenidList = append(tokenidList, tokenid)
+				tokenidArr = append(tokenidArr, tokenid)
 			}
 			result[asset] = tokenidList
 		}
 	}
 	result["tokenidArr"] = tokenidArr
 	return result
+}
+
+func toString(v interface{}) (string, bool) {
+	switch x := v.(type) {
+	case string:
+		return x, true
+	default:
+		return "", false
+	}
+}
+
+func toMap(v interface{}) (map[string]interface{}, bool) {
+	m, ok := v.(map[string]interface{})
+	return m, ok
+}
+
+func toPrimitiveA(v interface{}) (primitive.A, bool) {
+	switch x := v.(type) {
+	case primitive.A:
+		return x, true
+	case []interface{}:
+		return primitive.A(x), true
+	default:
+		return nil, false
+	}
+}
+
+func toInterfaceSlice(v interface{}) ([]interface{}, bool) {
+	switch x := v.(type) {
+	case []interface{}:
+		return x, true
+	case primitive.A:
+		return []interface{}(x), true
+	default:
+		return nil, false
+	}
+}
+
+func toMapSlice(v interface{}) ([]map[string]interface{}, bool) {
+	switch x := v.(type) {
+	case []map[string]interface{}:
+		return x, true
+	case []interface{}:
+		result := make([]map[string]interface{}, 0, len(x))
+		for _, it := range x {
+			m, ok := toMap(it)
+			if !ok {
+				continue
+			}
+			result = append(result, m)
+		}
+		return result, true
+	default:
+		return nil, false
+	}
 }
 
 func GetImgFromTokenURL(tokenurl string, asset string, tokenid string) (map[string]interface{}, error) {
@@ -726,7 +885,7 @@ func GetImgFromTokenURL(tokenurl string, asset string, tokenid string) (map[stri
 		return nil, err
 	}
 	//
-	num, _ := base64.StdEncoding.DecodeString(tokenid)
+	num, err := base64.StdEncoding.DecodeString(tokenid)
 	if err != nil {
 		return nil, err
 	}
@@ -740,7 +899,7 @@ func GetImgFromTokenURL(tokenurl string, asset string, tokenid string) (map[stri
 	jsonData := make(map[string]interface{})
 	if !isExit { //读取数据并保存到本地
 		filepath := CreateDateDir(currentPath+"/tokenURI/", asset)
-		response, err := http.Get(tokenurl)
+		response, err := httpx.Get(tokenurl)
 		if err != nil {
 			log.Println("http get error: ", err)
 			return nil, err
@@ -751,15 +910,13 @@ func GetImgFromTokenURL(tokenurl string, asset string, tokenid string) (map[stri
 
 		out, err := os.Create(filepath + "/" + filename)
 		if err != nil {
-			panic(err)
 			return nil, err
 		}
 
 		wt := bufio.NewWriter(out)
 		defer out.Close()
 
-		n, err := io.Copy(wt, response.Body)
-		fmt.Println("write", n)
+		_, err = io.Copy(wt, response.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -769,14 +926,12 @@ func GetImgFromTokenURL(tokenurl string, asset string, tokenid string) (map[stri
 	//从文件读数据
 	jsonFile, err := os.Open(path)
 	if err != nil {
-		fmt.Println("error opening json file")
 		return nil, err
 	}
 	defer jsonFile.Close()
 
 	body, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		fmt.Println("error reading json file")
 		return nil, err
 	}
 
@@ -790,10 +945,18 @@ func GetImgFromTokenURL(tokenurl string, asset string, tokenid string) (map[stri
 		attributes, ok := jsonData["attributes"]
 
 		if ok {
-			attribute := attributes.([]interface{})
-			for _, item := range attribute {
-				it := item.(map[string]interface{})
-				jsonData[it["trait_type"].(string)] = it["value"]
+			if attribute, ok := toInterfaceSlice(attributes); ok {
+				for _, item := range attribute {
+					it, ok := toMap(item)
+					if !ok {
+						continue
+					}
+					traitType, ok := toString(it["trait_type"])
+					if !ok || traitType == "" {
+						continue
+					}
+					jsonData[traitType] = it["value"]
+				}
 			}
 			delete(jsonData, "attributes")
 		}
@@ -832,7 +995,7 @@ func ImagUrl(asset string, imgurl string, pre string) string {
 	case "staging":
 		url = "https://img.megaoasis.io/" + pre + "/" + asset + "/" + name
 	default:
-		log2.Fatalf("runtime environment mismatch")
+		log2.Errorf("runtime environment mismatch")
 	}
 	return url
 }
@@ -841,14 +1004,8 @@ func CreateDateDir(basepath string, folderName string) string {
 
 	folderPath := filepath.Join(basepath, folderName)
 	if _, err := os.Stat(folderPath); os.IsNotExist(err) {
-		err := os.MkdirAll(folderPath, 0777)
-		if err != nil {
-			fmt.Println("Create dir error: %v", err)
-		}
-		err = os.Chmod(folderPath, 0777)
-		if err != nil {
-			fmt.Println("Chmod error: %v", err)
-		}
+		_ = os.MkdirAll(folderPath, 0777)
+		_ = os.Chmod(folderPath, 0777)
 	}
 	return folderPath
 }

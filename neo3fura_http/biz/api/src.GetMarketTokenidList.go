@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"neo3fura_http/lib/mapsort"
@@ -24,7 +23,6 @@ func (me *T) GetMarketTokenidList(args struct {
 	Raw        *map[string]interface{}
 }, ret *json.RawMessage) error {
 	currentTime := time.Now().UnixNano() / 1e6
-	fmt.Printf("", currentTime)
 	if args.Account.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}

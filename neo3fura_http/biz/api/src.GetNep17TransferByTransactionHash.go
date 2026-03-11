@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/joeqian10/neo3-gogogo/crypto"
 	"github.com/joeqian10/neo3-gogogo/helper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -121,7 +122,7 @@ func (me *T) GetNep17TransferByTransactionHash(args struct {
 				item["decimals"] = r["decimals"]
 				item["symbol"] = r["symbol"]
 
-			} else if err.Error() == "NOT FOUND" {
+			} else if errors.Is(err, stderr.ErrNotFound) {
 				item["tokenname"] = ""
 				item["decimals"] = ""
 				item["symbol"] = ""
