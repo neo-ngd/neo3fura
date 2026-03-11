@@ -62,7 +62,7 @@ func (me *T) GetFirstEventByTransactionHash() error {
 			log2.Fatalf("Query Execution error:%v", err)
 		}
 		if len(r1) > 0 && r1["vmstate"] != nil && r1["vmstate"] != "" {
-			fmt.Println("TEST", r1["vmstate"], r2["vmstate"])
+			fmt.Println("TEST-", r1["vmstate"], r2["vmstate"])
 			r2["vmstate"] = r1["vmstate"]
 			_, err = me.Client.SaveJob(struct {
 				Collection string

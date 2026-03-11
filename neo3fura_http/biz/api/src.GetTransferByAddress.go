@@ -2,82 +2,191 @@ package api
 
 import (
 	"encoding/json"
+	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
+	"sort"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (me *T) GetTransferByAddress(args struct {
 	Address h160.T
 	Limit   int64
 	Skip    int64
+	Cursor  string
 	Filter  map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.Address.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-	if args.Limit == 0 {
-		args.Limit = 512
+	if args.Limit <= 0 {
+		args.Limit = consts.DefaultLimit
 	}
-	r1, _, err1 := me.Client.QueryAll(struct {
+	if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
+	if args.Skip < 0 {
+		args.Skip = 0
+	}
+	baseFilter := bson.M{"$or": []interface{}{
+		bson.M{"from": args.Address.TransferredVal()},
+		bson.M{"to": args.Address.TransferredVal()},
+	}}
+	queryFilter := bson.M{}
+	if args.Cursor != "" {
+		cursorFilter, err := buildIntDescCursorFilter("timestamp", args.Cursor)
+		if err != nil {
+			return err
+		}
+		queryFilter = bson.M{
+			"$and": []interface{}{
+				baseFilter,
+				cursorFilter,
+			},
+		}
+		args.Skip = 0
+	} else {
+		queryFilter = baseFilter
+	}
+	queryLimit := args.Limit + 1
+
+	// In compatibility mode, query each collection separately and merge in memory.
+	// This avoids relying on $unionWith on older MongoDB deployments.
+	fetchLimit := args.Skip + queryLimit
+	if fetchLimit < queryLimit {
+		fetchLimit = queryLimit
+	}
+
+	nep11Pipeline := []bson.M{
+		bson.M{"$match": queryFilter},
+		bson.M{"$sort": bson.M{"timestamp": -1, "_id": -1}},
+		bson.M{"$limit": fetchLimit},
+	}
+	r1, err := me.Client.QueryAggregate(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
 		Filter     bson.M
+		Pipeline   []bson.M
 		Query      []string
-		Limit      int64
-		Skip       int64
 	}{
 		Collection: "Nep11TransferNotification",
-		Index:      "GetNep11TransferByAddress",
+		Index:      "GetTransferByAddress",
 		Sort:       bson.M{},
-		Filter: bson.M{"$or": []interface{}{
-			bson.M{"from": args.Address.TransferredVal()},
-			bson.M{"to": args.Address.TransferredVal()},
-		}},
-		Query: []string{},
+		Filter:     bson.M{},
+		Pipeline:   nep11Pipeline,
+		Query:      []string{},
 	}, ret)
-	if err1 != nil {
-		return err1
+	if err != nil {
+		return err
 	}
 
-	r2, _, err2 := me.Client.QueryAll(struct {
+	nep17Pipeline := []bson.M{
+		bson.M{"$match": queryFilter},
+		bson.M{"$sort": bson.M{"timestamp": -1, "_id": -1}},
+		bson.M{"$limit": fetchLimit},
+	}
+	r2, err := me.Client.QueryAggregate(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
 		Filter     bson.M
+		Pipeline   []bson.M
 		Query      []string
-		Limit      int64
-		Skip       int64
 	}{
 		Collection: "TransferNotification",
-		Index:      "GetNep17TransferByAddress",
+		Index:      "GetTransferByAddress",
 		Sort:       bson.M{},
-		Filter: bson.M{"$or": []interface{}{
-			bson.M{"from": args.Address.TransferredVal()},
-			bson.M{"to": args.Address.TransferredVal()},
-		}},
-		Query: []string{},
+		Filter:     bson.M{},
+		Pipeline:   nep17Pipeline,
+		Query:      []string{},
 	}, ret)
-
-	if err2 != nil {
-		return err2
-	}
-	r3 := append(r1, r2...)
-	r4 := make([]map[string]interface{}, 0)
-	for i, item := range r3 {
-		if int64(i) < args.Skip {
-			continue
-		} else if int64(i) > args.Skip+args.Limit-1 {
-			continue
-		} else {
-			r4 = append(r4, item)
-		}
-	}
-	r5, err := me.FilterArrayAndAppendCount(r4, int64(len(r3)), args.Filter)
 	if err != nil {
 		return err
+	}
+
+	merged := append(r1, r2...)
+	sort.Slice(merged, func(i, j int) bool {
+		ti, _ := int64FromAny(merged[i]["timestamp"])
+		tj, _ := int64FromAny(merged[j]["timestamp"])
+		if ti != tj {
+			return ti > tj
+		}
+		oi, ok1 := merged[i]["_id"].(primitive.ObjectID)
+		oj, ok2 := merged[j]["_id"].(primitive.ObjectID)
+		if ok1 && ok2 {
+			return oi.Hex() > oj.Hex()
+		}
+		return false
+	})
+
+	start := args.Skip
+	if start > int64(len(merged)) {
+		start = int64(len(merged))
+	}
+	end := start + queryLimit
+	if end > int64(len(merged)) {
+		end = int64(len(merged))
+	}
+	window := merged[start:end]
+
+	hasNext := int64(len(window)) > args.Limit
+	page := window
+	if hasNext {
+		page = window[:args.Limit]
+	}
+
+	nep11CountRow, err := me.Client.QueryDocument(struct {
+		Collection string
+		Index      string
+		Sort       bson.M
+		Filter     bson.M
+	}{
+		Collection: "Nep11TransferNotification",
+		Index:      "GetTransferByAddressCount",
+		Sort:       bson.M{},
+		Filter:     baseFilter,
+	}, ret)
+	if err != nil {
+		return err
+	}
+	nep17CountRow, err := me.Client.QueryDocument(struct {
+		Collection string
+		Index      string
+		Sort       bson.M
+		Filter     bson.M
+	}{
+		Collection: "TransferNotification",
+		Index:      "GetTransferByAddressCount",
+		Sort:       bson.M{},
+		Filter:     baseFilter,
+	}, ret)
+	if err != nil {
+		return err
+	}
+	totalCount := nep11CountRow["total counts"].(int64) + nep17CountRow["total counts"].(int64)
+
+	r5, err := me.FilterArrayAndAppendCount(page, totalCount, args.Filter)
+	if err != nil {
+		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		sortValue, ok := int64FromAny(last["timestamp"])
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeIntDescCursor(sortValue, oid)
+		if err != nil {
+			return err
+		}
+		r5["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r5)
 	if err != nil {

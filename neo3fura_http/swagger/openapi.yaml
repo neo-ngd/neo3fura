@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Neo3Fura JSON-RPC API
+  version: 1.0.0
+  description: |
+    Neo3Fura HTTP endpoint is JSON-RPC 2.0 over POST `/`.
+    This OpenAPI file documents common methods and pagination behavior.
+servers:
+  - url: http://127.0.0.1:1926
+    description: Local
+paths:
+  /:
+    post:
+      tags:
+        - JSON-RPC
+      summary: JSON-RPC entrypoint
+      description: Send JSON-RPC 2.0 request to call Neo3Fura methods.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JsonRpcRequest'
+            examples:
+              getTransactionList:
+                summary: GetTransactionList (cursor first)
+                value:
+                  jsonrpc: "2.0"
+                  method: "GetTransactionList"
+                  params:
+                    Limit: 20
+                    Cursor: ""
+                  id: 1
+              getAddressList:
+                summary: GetAddressList (cursor first)
+                value:
+                  jsonrpc: "2.0"
+                  method: "GetAddressList"
+                  params:
+                    Limit: 20
+                    Cursor: ""
+                  id: 1
+              getTransferByAddress:
+                summary: GetTransferByAddress
+                value:
+                  jsonrpc: "2.0"
+                  method: "GetTransferByAddress"
+                  params:
+                    Address: "0xb31b1ef4b504f5413dbed7e6e58fd11dedb6f4ab"
+                    Limit: 20
+                    Cursor: ""
+                  id: 1
+      responses:
+        '200':
+          description: JSON-RPC response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonRpcResponse'
+  /metrics:
+    get:
+      tags:
+        - Ops
+      summary: Prometheus metrics
+      responses:
+        '200':
+          description: Metrics text
+          content:
+            text/plain:
+              schema:
+                type: string
+  /swagger/openapi.yaml:
+    get:
+      tags:
+        - Docs
+      summary: OpenAPI YAML
+      responses:
+        '200':
+          description: OpenAPI document
+          content:
+            application/yaml:
+              schema:
+                type: string
+components:
+  schemas:
+    JsonRpcRequest:
+      type: object
+      required:
+        - jsonrpc
+        - method
+        - params
+        - id
+      properties:
+        jsonrpc:
+          type: string
+          example: "2.0"
+        method:
+          type: string
+          example: "GetTransactionList"
+        params:
+          type: object
+          additionalProperties: true
+          description: Method-specific parameters.
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+    JsonRpcResponse:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          oneOf:
+            - type: integer
+            - type: string
+        result:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Usually includes `result`, `totalCount`, and optional `nextCursor`.
+        error:
+          nullable: true
+          oneOf:
+            - type: string
+            - type: object
