@@ -66,7 +66,6 @@ func (me *T) GetAssetInfos(args struct {
 		return err
 	}
 
-	fmt.Println("count:", count)
 	// retrieve all tokens
 	r2, err := me.Client.QueryLastJob(struct{ Collection string }{Collection: "PopularTokens"})
 	if err != nil {

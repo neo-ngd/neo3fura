@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"io/ioutil"
+	"neo3fura_http/lib/httpx"
 	"net/http"
 )
 
@@ -14,17 +15,16 @@ func (me *T) GetOpenseaSingleCollection(args struct {
 
 	var requestGetURLNoParams = "https://api.opensea.io/api/v1/collection/" + args.CollectionSlug
 
-	client := &http.Client{}
 	req, err := http.NewRequest("GET", requestGetURLNoParams, nil)
 	if err != nil {
-		panic(err)
 		return err
 	}
 	req.Header.Set("X-API-KEY", args.ApiKey)
-	resp, err := client.Do(req)
+	resp, err := httpx.Do(req)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	resbody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"gopkg.in/yaml.v2"
 	"math"
@@ -530,37 +529,7 @@ func (me *T) GetNFTRecordByAddress(args struct {
 
 				}
 
-				//添加nns
-
-				fromAddress := ""
-				toAddress := ""
-				if rr["from"] != nil {
-					fromAddress = rr["from"].(string)
-				}
-				if rr["to"] != nil {
-					toAddress = rr["to"].(string)
-				}
-
-				var fromNNS, fromUserName string
-				var toNNS, toUserName string
-				if fromAddress != "" {
-					fromNNS, fromUserName, err = GetNNSByAddress(fromAddress)
-					if err != nil {
-						return err
-					}
-				}
-				if toAddress != "" {
-					toNNS, toUserName, err = GetNNSByAddress(toAddress)
-					if err != nil {
-						return err
-					}
-				}
-				rr["from_nns"] = fromNNS
-				rr["to_nns"] = toNNS
-				rr["from_userName"] = fromUserName
-				rr["to_userName"] = toUserName
-
-				result = append(result, rr)
+					result = append(result, rr)
 			}
 
 		}
@@ -640,8 +609,7 @@ func (me *T) GetNFTRecordByAddress(args struct {
 			////获取nft的属性
 			var raw3 map[string]interface{}
 			err3 := getNFTProperties(strval.T(tokenid), h160.T(asset), me, ret, args.Filter, &raw3)
-			fmt.Println("error", raw3)
-			log2.Infof("error", raw3)
+			log2.Infof("getNFTProperties result: %v", raw3)
 			if err3 != nil {
 				rr["image"] = ""
 				rr["name"] = ""
@@ -667,6 +635,36 @@ func (me *T) GetNFTRecordByAddress(args struct {
 				rr["state"] = NFTevent.Receive.Val()
 			}
 			result = append(result, rr)
+		}
+	}
+
+	// Batch fetch NNS data for all from/to addresses concurrently
+	allAddrs := make([]string, 0, len(result)*2)
+	for _, rr := range result {
+		if from, ok := rr["from"].(string); ok && from != "" {
+			allAddrs = append(allAddrs, from)
+		}
+		if to, ok := rr["to"].(string); ok && to != "" {
+			allAddrs = append(allAddrs, to)
+		}
+	}
+	nnsResults := GetNNSByAddresses(allAddrs)
+	for _, rr := range result {
+		fromAddr, _ := rr["from"].(string)
+		toAddr, _ := rr["to"].(string)
+		if res, ok := nnsResults[fromAddr]; ok && res.Err == nil {
+			rr["from_nns"] = res.NNS
+			rr["from_userName"] = res.UserName
+		} else {
+			rr["from_nns"] = ""
+			rr["from_userName"] = ""
+		}
+		if res, ok := nnsResults[toAddr]; ok && res.Err == nil {
+			rr["to_nns"] = res.NNS
+			rr["to_userName"] = res.UserName
+		} else {
+			rr["to_nns"] = ""
+			rr["to_userName"] = ""
 		}
 	}
 
@@ -888,7 +886,7 @@ func OpenMarketHashFile() (Config, error) {
 	defer func(f *os.File) {
 		err := f.Close()
 		if err != nil {
-			log2.Fatalf("Closing file error: %v", err)
+			log2.Errorf("Closing file error: %v", err)
 		}
 	}(f)
 	var cfg Config

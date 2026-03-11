@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
+	log2 "neo3fura_ws/lib/log"
 )
 
 // Address
@@ -24,23 +24,27 @@ func (me *T) GetContractCount(ch *chan map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer cs.Close(context.TODO())
 	// Whenever there is a new change event, decode the change event and print some information about it
 	for cs.Next(context.TODO()) {
 		var changeEvent map[string]interface{}
 		err := cs.Decode(&changeEvent)
 		if err != nil {
-			log.Fatal(err)
+			log2.Errorf("GetContractCount decode change event failed: %v", err)
+			continue
 		}
 		newContractCount, err := me.getContractCount()
 		if err != nil {
 			return err
 		}
-		if contractCount["ContractCount"].(map[string]interface{})["total counts"] != newContractCount["ContractCount"].(map[string]interface{})["total counts"] {
+		oldTotal, okOld := extractTotalCounts(contractCount["ContractCount"])
+		newTotal, okNew := extractTotalCounts(newContractCount["ContractCount"])
+		if !okOld || !okNew || oldTotal != newTotal {
 			*ch <- newContractCount
 			contractCount = newContractCount
 		}
 	}
-	return nil
+	return cs.Err()
 }
 
 func (me T) getContractCount() (map[string]interface{}, error) {

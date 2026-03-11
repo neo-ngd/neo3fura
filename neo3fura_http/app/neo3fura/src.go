@@ -45,7 +45,7 @@ func OpenConfigFile() (Config, error) {
 	defer func(f *os.File) {
 		err := f.Close()
 		if err != nil {
-			log2.Fatalf("Closing file error: %v", err)
+			log2.Errorf("Closing file error: %v", err)
 		}
 	}(f)
 	var cfg Config
@@ -182,43 +182,57 @@ func main() {
 
 	if cfg.Replica == "master" {
 		go func() {
-			err := w.GetFirstEventByTransactionHash()
-			if err != nil {
-				log2.Fatalf("run watching error:%v", err)
+			for {
+				err := w.GetFirstEventByTransactionHash()
+				if err != nil {
+					log2.Errorf("run watching error:%v", err)
+					time.Sleep(2 * time.Second)
+					continue
+				}
+				return
 			}
 		}()
 
 		c1 := cron.New()
 		c2 := cron.New()
 		c3 := cron.New()
+		runAsyncJob := func(name string, fn func() error) {
+			go func() {
+				if err := fn(); err != nil {
+					log2.Errorf("%s error: %v", name, err)
+				}
+			}()
+		}
 
-		err = c1.AddFunc("@daily", func() {
+		if err = c1.AddFunc("@daily", func() {
 			log2.Infof("Start daily job")
-			go j.GetPopularTokens()
-			go j.GetDailyTransactions()
-			go j.GetNewAddresses()
-			go j.GetActiveAddresses()
+			runAsyncJob("GetPopularTokens", j.GetPopularTokens)
+			runAsyncJob("GetDailyTransactions", j.GetDailyTransactions)
+			runAsyncJob("GetNewAddresses", j.GetNewAddresses)
+			runAsyncJob("GetActiveAddresses", j.GetActiveAddresses)
 			go j.GetMarketDailyVolume() //获取market 前一天的交易数据
-		})
-		err = c2.AddFunc("@hourly", func() { //@hourly
+		}); err != nil {
+			log2.Fatalf("add daily job function error:%s", err)
+		}
+		if err = c2.AddFunc("@hourly", func() { //@hourly
 			log2.Infof("Start hourly job")
-			go j.GetHoldersByContractHash()
-			go j.GetTransactionList()
-			go j.GetBlockInfoList()
-			go j.GetHourlyTransactions()
-			go j.GetMarketHourlyVolume() //获取market当天的交易数据
-		})
-
-		err = c3.AddFunc("@every 10m", func() {
+			runAsyncJob("GetHoldersByContractHash", j.GetHoldersByContractHash)
+			runAsyncJob("GetTransactionList", j.GetTransactionList)
+			runAsyncJob("GetBlockInfoList", j.GetBlockInfoList)
+			runAsyncJob("GetHourlyTransactions", j.GetHourlyTransactions)
+			runAsyncJob("GetMarketHourlyVolume", j.GetMarketHourlyVolume) //获取market当天的交易数据
+		}); err != nil {
+			log2.Fatalf("add hourly job function error:%s", err)
+		}
+		if err = c3.AddFunc("@every 10m", func() {
 			log2.Infof("Start mintnue job")
 			go j.GetMarketSupply()
 			go j.GetMarketTxAmount()
 			go j.GetMarketOwnerCount()
 			go j.GetNFTFloorPrice()
 			//go j.GetNFTIndex()
-		})
-		if err != nil {
-			log2.Fatal("add job function error:%s", err)
+		}); err != nil {
+			log2.Fatalf("add 10m job function error:%s", err)
 		}
 		c1.Start()
 		c2.Start()
@@ -256,12 +270,13 @@ func main() {
 		_, _ = writer.Write(doc)
 	})
 	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		start := time.Now()
 		monitor.Http_request_qps.Inc()
 		monitor.Http_request_total.Inc()
 		monitor.Http_request_in_flight.Inc()
 		defer monitor.Http_request_in_flight.Dec()
-		monitor.Http_request_duration_seconds.Observe(time.Since(time.Now()).Seconds())
 		h.ServeHTTP(writer, request)
+		monitor.Http_request_duration_seconds.Observe(time.Since(start).Seconds())
 	})
 	mux.HandleFunc("/upload", func(writer http.ResponseWriter, request *http.Request) {
 		v.MultipleFile(writer, request)
@@ -903,11 +918,9 @@ func initializeMongoOnlineClient(cfg Config, ctx context.Context) (*mongo.Client
 		dbOnline = cfg.Database_Staging.Database
 	default:
 		log2.Fatalf("runtime environment mismatch: RUNTIME=%s (expected: dev/test/test2/staging)", rt)
-		os.Exit(1)
 	}
 	if clientOptions == nil {
 		log2.Fatalf("mongo client options is nil, RUNTIME=%s", rt)
-		os.Exit(1)
 	}
 
 	clientOptions.SetMaxPoolSize(50)
@@ -925,13 +938,12 @@ func initializeNeoFsHost(cfg Config) string {
 	rt := os.ExpandEnv("${RUNTIME}")
 	var neoFsHost string
 	switch rt {
-	case "test":
+	case "dev", "test", "test2":
 		neoFsHost = cfg.NeoFs_Test.Host + ":" + cfg.NeoFs_Test.Port + "/gate" + "/get/" + cfg.NeoFs_Test.ContainerId + "/"
 	case "staging":
 		neoFsHost = cfg.NeoFs_Main.Host + ":" + cfg.NeoFs_Main.Port + "/gate" + "/get/" + cfg.NeoFs_Main.ContainerId + "/"
 	default:
-		log2.Fatalf("runtime environment mismatch: RUNTIME=%s (expected: test/staging)", rt)
-		os.Exit(1)
+		log2.Fatalf("runtime environment mismatch: RUNTIME=%s (expected: dev/test/test2/staging)", rt)
 	}
 	return neoFsHost
 }

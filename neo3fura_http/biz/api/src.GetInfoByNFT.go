@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"math/big"
-	"net/http"
+	"neo3fura_http/lib/httpx"
+	log2 "neo3fura_http/lib/log"
 	"os"
 	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"neo3fura_http/lib/type/Contract"
 	"neo3fura_http/lib/type/h160"
@@ -23,7 +23,14 @@ func (me *T) GetInfoByNFT(args struct {
 	Tokenid []string
 	Filter  map[string]interface{}
 	Raw     *map[string]interface{}
-}, ret *json.RawMessage) error {
+}, ret *json.RawMessage) (errRet error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log2.Errorf("GetInfoByNFT panic recovered: %v", r)
+			errRet = stderr.ErrData
+		}
+	}()
+
 	if args.Asset.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
@@ -85,11 +92,23 @@ func (me *T) GetInfoByNFT(args struct {
 
 	for _, item := range r1 {
 		//NFT状态   上架 （售卖中  成交未领取）  未上架
-		asset := item["asset"].(string)
-		tokenid := item["tokenid"].(string)
-		ddl := item["deadline"].(int64)
+		asset, ok := toString(item["asset"])
+		if !ok || asset == "" {
+			continue
+		}
+		tokenid, ok := toString(item["tokenid"])
+		if !ok || tokenid == "" {
+			continue
+		}
+		ddl, ok := asInt64(item["deadline"])
+		if !ok {
+			continue
+		}
 
-		bidAmount := item["bidAmount"].(primitive.Decimal128).String()
+		bidAmount, ok := asDecimalString(item["bidAmount"])
+		if !ok {
+			bidAmount = "0"
+		}
 		if item["market"] != item["owner"] || ddl < currentTime {
 			item["state"] = "notlist"
 		} else {
@@ -107,7 +126,10 @@ func (me *T) GetInfoByNFT(args struct {
 		item["nonce"] = 0
 		item["eventname"] = ""
 
-		auctionType := item["auctionType"].(int32)
+		auctionType, ok := asInt32(item["auctionType"])
+		if !ok {
+			auctionType = 0
+		}
 		if ddl > currentTime {
 			if auctionType == 1 {
 				item["buyNowAsset"] = item["auctionAsset"]
@@ -126,7 +148,8 @@ func (me *T) GetInfoByNFT(args struct {
 				item["lastSoldAsset"] = item["auctionAsset"]
 				item["lastSoldAmount"] = item["bidAmount"]
 			}
-			if item["owner"] == item["market"] && item["market"].(string) == primaryMarket.Val() { //一级市场过期
+			market, _ := toString(item["market"])
+			if item["owner"] == item["market"] && market == primaryMarket.Val() { //一级市场过期
 				if bidAmount == "0" {
 					item["lastSoldAsset"] = item["auctionAsset"]
 					item["lastSoldAmount"] = item["auctionAmount"]
@@ -135,18 +158,27 @@ func (me *T) GetInfoByNFT(args struct {
 			}
 		}
 		var finishTime int64
-		if item["eventlist"] != nil && len(item["eventlist"].(primitive.A)) > 0 {
-			eventlist := item["eventlist"].(primitive.A)
+		eventlist, ok := toPrimitiveA(item["eventlist"])
+		if item["eventlist"] != nil && ok && len(eventlist) > 0 {
 			for _, it := range eventlist {
-				eventItem := it.(map[string]interface{})
-				eventname := eventItem["eventname"]
-				extendData := eventItem["extendData"]
-				market := eventItem["market"].(string)
+				eventItem, ok := toMap(it)
+				if !ok {
+					continue
+				}
+				eventname, _ := toString(eventItem["eventname"])
+				extendData, _ := toString(eventItem["extendData"])
+				market, _ := toString(eventItem["market"])
 
 				data := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(extendData.(string)), &data); err == nil {
+				if extendData == "" {
+					continue
+				}
+				if err := json.Unmarshal([]byte(extendData), &data); err == nil {
 					if eventname == "Claim" {
-						time := eventItem["timestamp"].(int64)
+						time, ok := asInt64(eventItem["timestamp"])
+						if !ok {
+							continue
+						}
 						if time > finishTime {
 							finishTime = time
 							item["lastSoldAsset"] = data["auctionAsset"]
@@ -155,7 +187,10 @@ func (me *T) GetInfoByNFT(args struct {
 
 					} else if eventname == "Offer" || eventname == "OfferCollection" {
 						//判断offer 有效期以及是否有足够的保证金
-						deadline := data["deadline"].(string)
+						deadline, ok := toString(data["deadline"])
+						if !ok || deadline == "" {
+							continue
+						}
 						offerddl, _ := strconv.ParseInt(deadline, 10, 64)
 
 						highestOffer := make(map[string]interface{})
@@ -173,8 +208,14 @@ func (me *T) GetInfoByNFT(args struct {
 								return stderr.ErrGetHighestOffer
 							}
 							if len(highestOffer) > 0 {
-								offerAmount := highestOffer["offerAmount"].(int64)
-								guarantee := highestOffer["guarantee"].(*big.Int)
+								offerAmount, ok := asInt64(highestOffer["offerAmount"])
+								if !ok {
+									continue
+								}
+								guarantee, ok := asBigInt(highestOffer["guarantee"])
+								if !ok {
+									continue
+								}
 								amount := big.NewInt(offerAmount)
 								if guarantee.Cmp(amount) == 1 {
 									item["offerAsset"] = highestOffer["offerAsset"]
@@ -185,13 +226,13 @@ func (me *T) GetInfoByNFT(args struct {
 							}
 						}
 					} else if eventname == "CompleteOffer" || eventname == "CompleteOfferCollection" {
-						time := eventItem["timestamp"].(int64)
+						time, ok := asInt64(eventItem["timestamp"])
+						if !ok {
+							continue
+						}
 						if time > finishTime {
 							finishTime = time
 							item["lastSoldAsset"] = data["offerAsset"]
-							if err != nil {
-								return err
-							}
 							item["lastSoldAmount"] = data["offerAmount"]
 
 						}
@@ -207,19 +248,26 @@ func (me *T) GetInfoByNFT(args struct {
 		if item["market"] == item["owner"] && ddl < currentTime && bidAmount != "0" { // 未领取
 			item["owner"] = item["bidder"]
 		}
-		//获取Owner 地址的nns信息
-		owner := item["owner"].(string)
-		var nns, userName string
-		if owner != "" {
-			nns, userName, err = GetNNSByAddress(owner)
-			if err != nil {
-				return err
-			}
-		}
-
-		item["nns"] = nns
-		item["userName"] = userName
 		delete(item, "eventlist")
+	}
+
+	// Batch fetch NNS data for all owners concurrently
+	ownerAddrs := make([]string, 0, len(r1))
+	for _, item := range r1 {
+		if owner, ok := item["owner"].(string); ok && owner != "" {
+			ownerAddrs = append(ownerAddrs, owner)
+		}
+	}
+	nnsResults := GetNNSByAddresses(ownerAddrs)
+	for _, item := range r1 {
+		owner, _ := item["owner"].(string)
+		if res, ok := nnsResults[owner]; ok && res.Err == nil {
+			item["nns"] = res.NNS
+			item["userName"] = res.UserName
+		} else {
+			item["nns"] = ""
+			item["userName"] = ""
+		}
 	}
 
 	count := len(r1)
@@ -247,27 +295,73 @@ func GetNNSByAddress(address string) (string, string, error) {
 	} else if rt == "test" {
 		url = "https://megaoasis.ngd.network:8889/profile/get?address=" //test
 	}
-	//fmt.Println(url + address)
-	resp, err := http.Get(url + address)
+	resp, err := httpx.Get(url + address)
 	if err != nil {
 		return "", "", err
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	var nns, userName string
-	//fmt.Println("body:", string(body))
 	if string(body) != "" && string(body) != "null" {
 		var data map[string]interface{}
 		err = json.Unmarshal(body, &data)
 		if err != nil {
 			return "", "", err
 		}
-		nns = data["nns"].(string)
-		userName = data["username"].(string)
+		nns, _ = toString(data["nns"])
+		userName, _ = toString(data["username"])
 	} else {
 		nns = ""
 		userName = ""
 	}
 
 	return nns, userName, nil
+}
+
+// NNSResult holds the NNS and UserName for an address.
+type NNSResult struct {
+	NNS      string
+	UserName string
+	Err      error
+}
+
+// GetNNSByAddresses concurrently fetches NNS data for multiple addresses.
+// Returns a map[address]NNSResult. Limits concurrency to 10 goroutines.
+func GetNNSByAddresses(addresses []string) map[string]NNSResult {
+	results := make(map[string]NNSResult, len(addresses))
+	if len(addresses) == 0 {
+		return results
+	}
+
+	// Deduplicate addresses
+	unique := make(map[string]struct{}, len(addresses))
+	for _, addr := range addresses {
+		if addr != "" {
+			unique[addr] = struct{}{}
+		}
+	}
+
+	type indexedResult struct {
+		Address string
+		NNSResult
+	}
+
+	ch := make(chan indexedResult, len(unique))
+	sem := make(chan struct{}, 10) // concurrency limit
+
+	for addr := range unique {
+		sem <- struct{}{}
+		go func(a string) {
+			defer func() { <-sem }()
+			nns, userName, err := GetNNSByAddress(a)
+			ch <- indexedResult{Address: a, NNSResult: NNSResult{NNS: nns, UserName: userName, Err: err}}
+		}(addr)
+	}
+
+	for i := 0; i < len(unique); i++ {
+		r := <-ch
+		results[r.Address] = r.NNSResult
+	}
+
+	return results
 }

@@ -31,7 +31,8 @@ func (me T) GetNFTFloorPrice() {
 
 	assetList, err2 := me.GetNep11Asset()
 	if err2 != nil {
-		log2.Fatal("GetMarketNep11Asset err")
+		log2.Errorf("GetMarketNep11Asset err: %v", err2)
+		return
 	}
 
 	for _, it := range assetList {
@@ -57,14 +58,16 @@ func (me T) GetNFTFloorPrice() {
 			}, ret)
 
 		if err != nil {
-			log2.Fatal("GetMarketNep11Asset err")
+			log2.Errorf("GetMarketNep11Asset err: %v", err)
+			continue
 		}
 
 		for _, item := range r5 {
 			auctionAsset := item["auctionAsset"].(string)
 			auctionAmount, _, err2 := item["auctionAmount"].(primitive.Decimal128).BigInt()
 			if err2 != nil {
-				log2.Fatal("FloorPrice:: data conversion err:", err)
+				log2.Errorf("FloorPrice:: data conversion err: %v", err2)
+				continue
 			}
 
 			//价格转换
@@ -72,7 +75,8 @@ func (me T) GetNFTFloorPrice() {
 			decimal := dd[auctionAsset]               //获取精度
 			price, err3 := api.GetPrice(auctionAsset) //  获取价格
 			if err3 != nil {
-				log2.Fatal("FloorPrice:: get price err:", err)
+				log2.Errorf("FloorPrice:: get price err: %v", err3)
+				continue
 			}
 			if price == 0 {
 				price = 1
@@ -111,13 +115,14 @@ func (me T) GetNFTFloorPrice() {
 			Filter     bson.M
 		}{Collection: "MarketIndex", Data: result, Filter: bson.M{"asset": it}})
 		if err != nil {
-			log2.Fatal("floorPrice: MarketIndex update err")
+			log2.Errorf("floorPrice: MarketIndex update err: %v", err)
+			continue
 		}
 	}
 
 }
 
-//获取二级市场白名单中的所有NEP11资产
+// 获取二级市场白名单中的所有NEP11资产
 func (me T) GetNep11Asset() ([]string, error) {
 	rt := os.ExpandEnv("${RUNTIME}")
 	var secondMarketHash string

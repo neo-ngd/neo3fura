@@ -14,7 +14,7 @@ func (me *T) GetPopularToken(args struct {
 	Standard strval.T
 }, ret *json.RawMessage) error {
 
-	if args.Standard != "NEP11" && args.Standard != "NEP11" {
+	if args.Standard != "NEP11" && args.Standard != "NEP17" {
 		return stderr.ErrInvalidArgs
 	}
 	if args.Limit == 0 {

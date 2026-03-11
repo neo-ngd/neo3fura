@@ -2,8 +2,9 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"math"
 	"math/big"
 	"neo3fura_http/var/stderr"
@@ -24,7 +25,6 @@ func (me *T) GetMarketDailyVolume(args struct {
 	//currentTime := time.Now().UnixNano() / 1e6
 
 	rt := os.ExpandEnv("${RUNTIME}")
-	fmt.Println(rt)
 	//var secondMarketHash string
 	//if rt == "staging" {
 	//	secondMarketHash = "0xd2e7cf18ee0d9b509fac02457f54b63e47b25e29"
@@ -38,12 +38,12 @@ func (me *T) GetMarketDailyVolume(args struct {
 
 	assetList, err2 := me.GetNep11Asset()
 	if err2 != nil {
-		log2.Fatal("GetMarketNep11Asset err")
+		log2.Errorf("GetMarketNep11Asset err: %v", err2)
+		return err2
 	}
 
 	for _, it := range assetList {
 		//获取上架记录
-		fmt.Println(it)
 		r2, err := me.Client.QueryAggregate(
 			struct {
 				Collection string
@@ -68,7 +68,8 @@ func (me *T) GetMarketDailyVolume(args struct {
 			}, ret)
 
 		if err != nil {
-			log2.Fatal("Get Market transaction err: ", err)
+			log2.Errorf("Get Market transaction err: %v", err)
+			return err
 		}
 
 		for _, item := range r2 {
@@ -102,7 +103,8 @@ func (me *T) GetMarketDailyVolume(args struct {
 						}
 
 						if err != nil {
-							log2.Fatal("tokenCOnversion err:", err)
+							log2.Errorf("tokenCOnversion err: %v", err)
+							return err
 						}
 
 					} else if eventname == "CompleteOffer" {
@@ -114,9 +116,9 @@ func (me *T) GetMarketDailyVolume(args struct {
 						} else {
 							toAmount, err = TokenConversion(offerAsset, amount, consts.BNEO_Test)
 						}
-						fmt.Println("completeOffer :", toAmount)
 						if err != nil {
-							log2.Fatal("tokenCOnversion err:", err)
+							log2.Errorf("tokenCOnversion err: %v", err)
+							return err
 						}
 					}
 					dayVolume = dayVolume.Add(dayVolume, toAmount)
@@ -124,10 +126,16 @@ func (me *T) GetMarketDailyVolume(args struct {
 			}
 
 			dv, err := primitive.ParseDecimal128(dayVolume.String())
+			if err != nil {
+				return err
+			}
 			assertResult["dayVolume"] = dv
 
 			p := dayVolume.Quo(dayVolume, big.NewFloat(float64(dayAmount)))
 			ap, err := primitive.ParseDecimal128(p.String())
+			if err != nil {
+				return err
+			}
 			assertResult["avgPrice"] = ap
 
 			//存到本地数据库中
@@ -137,7 +145,8 @@ func (me *T) GetMarketDailyVolume(args struct {
 				Filter     bson.M
 			}{Collection: "MarketDayVolume", Data: assertResult, Filter: bson.M{"asset": it, "date": dateTime}})
 			if err != nil {
-				log2.Fatal("MarketIndex update err")
+				log2.Errorf("MarketIndex update err: %v", err)
+				return err
 			}
 		}
 
@@ -189,11 +198,10 @@ func (me *T) GetMarketDailyVolume(args struct {
 				Filter     bson.M
 			}{Collection: "MarketDayVolume", Filter: bson.M{"asset": it, "date": dateTime}})
 
-			if r == nil && err.Error() == "mongo: no documents in result" {
+			if r == nil && errors.Is(err, mongo.ErrNoDocuments) {
 				data := make(map[string]interface{})
 				data["asset"] = it
 				data["date"] = dateTime
-				fmt.Println(dateTime)
 				avg, _ := primitive.ParseDecimal128("0")
 				data["avgPrice"] = avg
 				data["dayAmount"] = int32(0)
@@ -206,7 +214,8 @@ func (me *T) GetMarketDailyVolume(args struct {
 					Filter     bson.M
 				}{Collection: "MarketDayVolume", Data: data, Filter: bson.M{"asset": it, "date": dateTime}})
 				if err != nil {
-					log2.Fatal("MarketDayVolume update err")
+					log2.Errorf("MarketDayVolume update err: %v", err)
+					return err
 				}
 			}
 
@@ -221,7 +230,7 @@ func (me *T) GetMarketDailyVolume(args struct {
 	return nil
 }
 
-//获取二级市场白名单中的所有NEP11资产
+// 获取二级市场白名单中的所有NEP11资产
 func (me T) GetNep11Asset() ([]string, error) {
 	rt := os.ExpandEnv("${RUNTIME}")
 	var secondMarketHash string
@@ -288,7 +297,7 @@ func (me T) GetNep11Asset() ([]string, error) {
 	return assetArr, nil
 }
 
-//token
+// token
 func TokenConversion(from string, amount *big.Int, to string) (*big.Float, error) {
 	if from == to {
 		return new(big.Float).SetInt(amount), nil

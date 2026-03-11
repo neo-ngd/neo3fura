@@ -33,7 +33,8 @@ func (me T) GetMarketTxAmount() {
 
 	assetList, err2 := me.GetNep11Asset()
 	if err2 != nil {
-		log2.Fatal("GetMarketNep11Asset err")
+		log2.Errorf("GetMarketNep11Asset err: %v", err2)
+		return
 	}
 
 	for _, it := range assetList {
@@ -118,7 +119,8 @@ func (me T) GetMarketTxAmount() {
 			Filter     bson.M
 		}{Collection: "MarketIndex", Data: result, Filter: bson.M{"asset": it}})
 		if err != nil {
-			log2.Fatal("totaltxamount: MarketIndex update err")
+			log2.Errorf("totaltxamount: MarketIndex update err: %v", err)
+			continue
 		}
 	}
 

@@ -30,7 +30,8 @@ func (me T) GetMarketOwnerCount() {
 
 	assetList, err2 := me.GetNep11Asset()
 	if err2 != nil {
-		log2.Fatal("GetMarketNep11Asset err")
+		log2.Errorf("GetMarketNep11Asset err: %v", err2)
+		return
 	}
 
 	for _, it := range assetList {
@@ -57,7 +58,8 @@ func (me T) GetMarketOwnerCount() {
 			}, ret)
 
 		if err != nil {
-			log2.Fatal("GetListedOwner err ")
+			log2.Errorf("GetListedOwner err: %v", err)
+			continue
 		}
 		owner := make(map[string]interface{})
 		for _, item := range r2 {
@@ -65,8 +67,8 @@ func (me T) GetMarketOwnerCount() {
 			bidAmountFlag := bidAmount.Cmp(big.NewInt(0))
 			//bidAmount, err2 := strconv.ParseInt(ba, 10, 64)
 			if err2 != nil {
-				log2.Fatal("OwnerCount: Covert err")
-
+				log2.Errorf("OwnerCount: convert err: %v", err2)
+				continue
 			}
 			deadline, _ := item["deadline"].(int64)
 			if item["owner"] == item["market"] && deadline > currentTime { //在售
@@ -104,7 +106,8 @@ func (me T) GetMarketOwnerCount() {
 			}, ret)
 
 		if err != nil {
-			log2.Fatal("GetNotListedOwner err ")
+			log2.Errorf("GetNotListedOwner err: %v", err)
+			continue
 		}
 
 		if len(r3) > 0 {
@@ -123,7 +126,8 @@ func (me T) GetMarketOwnerCount() {
 			Filter     bson.M
 		}{Collection: "MarketIndex", Data: result, Filter: bson.M{"asset": it}})
 		if err != nil {
-			log2.Fatal("MarketIndex update err")
+			log2.Errorf("MarketIndex update err: %v", err)
+			continue
 		}
 
 	}

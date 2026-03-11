@@ -3,17 +3,21 @@ package joh
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/thinkeridea/go-extend/exnet"
-	"gopkg.in/yaml.v2"
+	"io"
 	"io/ioutil"
-	"neo3fura_http/config"
-	log2 "neo3fura_http/lib/log"
-	"neo3fura_http/lib/rwio"
-	"neo3fura_http/lib/scex"
 	"net/http"
 	"net/rpc"
 	"path/filepath"
-	// "sort"
+	"sync/atomic"
+
+	"github.com/thinkeridea/go-extend/exnet"
+	"gopkg.in/yaml.v2"
+
+	"neo3fura_http/config"
+	"neo3fura_http/lib/httpx"
+	log2 "neo3fura_http/lib/log"
+	"neo3fura_http/lib/rwio"
+	"neo3fura_http/lib/scex"
 )
 
 // T ...
@@ -28,19 +32,34 @@ type Config struct {
 	} `yaml:"proxy"`
 }
 
-// To repost to every nodes in queue
-var repostMode int = 0
+// cachedConfig holds the config loaded once at first use.
+var cachedConfig *Config
+
+// apiSet is a map for O(1) method lookup, initialized once.
+var apiSet map[string]struct{}
+
+// repostMode uses atomic to avoid data race on concurrent writes.
+var repostMode int64 = 0
+
+func init() {
+	apiSet = make(map[string]struct{}, len(config.Apis))
+	for _, name := range config.Apis {
+		apiSet[name] = struct{}{}
+	}
+}
 
 func (me *T) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	body, err := ioutil.ReadAll(req.Body)
+	// Limit request body to 1MB to prevent OOM from oversized payloads
+	body, err := io.ReadAll(io.LimitReader(req.Body, 1<<20))
 	if err != nil {
 		log2.Infof("Error in reading body: %v", err)
 		http.Error(w, "can't read body", http.StatusBadRequest)
+		return
 	}
 	r := req.Clone(req.Context())
-	req.Body = ioutil.NopCloser(bytes.NewReader(body))
-	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	r.Body = io.NopCloser(bytes.NewReader(body))
 
 	ip := exnet.ClientPublicIP(r)
 	if ip == "" {
@@ -53,47 +72,66 @@ func (me *T) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log2.Infof("Error decoding in JSON: %v", err)
 		http.Error(w, "Can't decoding in JSON", http.StatusBadRequest)
+		return
+	}
+
+	log2.Infof("Request is: %v", request["method"])
+	c, err := me.getConfig()
+	if err != nil {
+		log2.Errorf("Open config file error:%s", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	method, _ := request["method"].(string)
+	if _, ok := apiSet[method]; ok {
+		// can find
+		w.Header().Set("Content-Type", "application/json")
+		log2.Infof("Serving %v", method)
+		conn := &rwio.T{R: req.Body, W: w}
+		codec := &scex.T{}
+		codec.Init(conn)
+		rpc.ServeCodec(codec)
 	} else {
-		log2.Infof("Request is: %v", request["method"])
-		c, err := me.OpenConfigFile()
-		if err != nil {
-			log2.Fatalf("Open config file error:%s", err)
+		// can't find — repost to proxy
+		log2.Infof("Repost %v", method)
+		if len(c.Proxy.URI) == 0 {
+			log2.Errorf("Repost skipped: no proxy URI configured")
+			http.Error(w, "proxy unavailable", http.StatusBadGateway)
+			return
 		}
-		if me.exists(request["method"].(string)) == true {
-			// can find
-			w.Header().Set("Content-Type", "application/json")
-			log2.Infof("Serving %v", request["method"])
-			conn := &rwio.T{R: req.Body, W: w}
-			codec := &scex.T{}
-			codec.Init(conn)
-			rpc.ServeCodec(codec)
-		} else {
-			// can't find
-			log2.Infof("Repost %v", request["method"])
-			responseBody := bytes.NewBuffer(body)
-			w.Header().Set("Content-Type", "application/json")
-			resp, err := http.Post(c.Proxy.URI[repostMode], "application/json", responseBody)
-			if err != nil {
-				log2.Fatalf("Repost error%v", err)
-			}
-			defer resp.Body.Close()
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				log2.Fatalf("Read err%v", err)
-			}
-			w.Write(body)
-			repostMode = (repostMode + 1) % 5
+		responseBody := bytes.NewBuffer(body)
+		w.Header().Set("Content-Type", "application/json")
+		idx := (atomic.AddInt64(&repostMode, 1) - 1) % int64(len(c.Proxy.URI))
+		resp, err := httpx.Post(c.Proxy.URI[idx], "application/json", responseBody)
+		if err != nil {
+			log2.Errorf("Repost error%v", err)
+			http.Error(w, "proxy request failed", http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log2.Errorf("Read err%v", err)
+			http.Error(w, "proxy response read failed", http.StatusBadGateway)
+			return
+		}
+		if _, err = w.Write(respBody); err != nil {
+			log2.Errorf("Write response error: %v", err)
 		}
 	}
 }
 
-func (me *T) exists(method string) bool {
-	for _, item := range config.Apis {
-		if item == method {
-			return true
-		}
+// getConfig returns the cached config, loading it once on first call.
+func (me *T) getConfig() (Config, error) {
+	if cachedConfig != nil {
+		return *cachedConfig, nil
 	}
-	return false
+	cfg, err := me.OpenConfigFile()
+	if err != nil {
+		return Config{}, err
+	}
+	cachedConfig = &cfg
+	return cfg, nil
 }
 
 func (me *T) OpenConfigFile() (Config, error) {

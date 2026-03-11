@@ -430,19 +430,26 @@ func (me *T) GetNFTInfoPrimaryMarket(Market string, Asset string, Tokenid string
 			}
 		}
 
-		//获取Owner 地址的nns信息
-		owner := item["owner"].(string)
-		var nns, userName string
-		if owner != "" {
-			nns, userName, err = GetNNSByAddress(owner)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		item["nns"] = nns
-		item["userName"] = userName
 		delete(item, "eventlist")
+	}
+
+	// Batch fetch NNS data for all owners concurrently
+	ownerAddrs := make([]string, 0, len(r1))
+	for _, item := range r1 {
+		if owner, ok := item["owner"].(string); ok && owner != "" {
+			ownerAddrs = append(ownerAddrs, owner)
+		}
+	}
+	nnsResults := GetNNSByAddresses(ownerAddrs)
+	for _, item := range r1 {
+		owner, _ := item["owner"].(string)
+		if res, ok := nnsResults[owner]; ok && res.Err == nil {
+			item["nns"] = res.NNS
+			item["userName"] = res.UserName
+		} else {
+			item["nns"] = ""
+			item["userName"] = ""
+		}
 	}
 
 	return r1, nil

@@ -3,7 +3,7 @@ package home
 import (
 	"context"
 	"encoding/json"
-	"log"
+	log2 "neo3fura_ws/lib/log"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,24 +25,28 @@ func (me *T) GetBlockInfoList(ch *chan map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer cs.Close(context.TODO())
 	// Whenever there is a new change event, decode the change event and print some information about it
 	for cs.Next(context.TODO()) {
 		var changeEvent map[string]interface{}
 		err := cs.Decode(&changeEvent)
 		if err != nil {
-			log.Fatal(err)
+			log2.Errorf("GetBlockInfoList decode change event failed: %v", err)
+			continue
 		}
 
 		newBlockInfoList, err := me.getBlockInfoList2()
 		if err != nil {
 			return err
 		}
-		if newBlockInfoList["BlockInfoList"].([]map[string]interface{})[0]["hash"] == newBlockInfoList["BlockInfoList"].([]map[string]interface{})[0]["hash"] {
+		oldHash, okOld := extractFirstHash(blockInfoList["BlockInfoList"])
+		newHash, okNew := extractFirstHash(newBlockInfoList["BlockInfoList"])
+		if okOld && okNew && newHash != oldHash {
 			*ch <- newBlockInfoList
 			blockInfoList = newBlockInfoList
 		}
 	}
-	return nil
+	return cs.Err()
 }
 
 func (me T) getBlockInfoList() (map[string]interface{}, error) {

@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"neo3fura_http/lib/cli"
+	"neo3fura_http/lib/httpx"
 	log2 "neo3fura_http/lib/log"
 	"net/http"
 	"os"
@@ -29,20 +30,20 @@ type T struct {
 	Client *cli.T
 }
 
-//定义http应答返回格式
+// 定义http应答返回格式
 type jsonResult struct {
 	Code int
 	Msg  string
 }
 
-//定义插入VerifiedContract表的数据格式, 记录被验证的合约
+// 定义插入VerifiedContract表的数据格式, 记录被验证的合约
 type insertVerifiedContract struct {
 	Hash          string
 	Id            int
 	Updatecounter int
 }
 
-//定义插入ContractSourceCode表的数据格式，记录被验证的合约源代码
+// 定义插入ContractSourceCode表的数据格式，记录被验证的合约源代码
 type insertContractSourceCode struct {
 	Hash          string
 	Updatecounter int
@@ -70,9 +71,19 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 		if err == io.EOF {
 			break
 		}
+		if err != nil {
+			log2.Errorf("Read multipart part error: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 
 		if part.FileName() == "" {
-			data, _ := ioutil.ReadAll(part)
+			data, err := ioutil.ReadAll(part)
+			if err != nil {
+				log2.Errorf("ReadAll error: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			if part.FormName() == "Contract" {
 				m1[part.FormName()] = string(data)
 			} else if part.FormName() == "Version" {
@@ -81,16 +92,23 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 				m1[part.FormName()] = string(data)
 			}
 		} else {
-			dst, _ := os.OpenFile(pathFile+"/"+part.FileName(), os.O_WRONLY|os.O_CREATE, 0666)
+			dst, err := os.OpenFile(pathFile+"/"+part.FileName(), os.O_WRONLY|os.O_CREATE, 0666)
+			if err != nil {
+				log2.Errorf("OpenFile error: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			defer func(dst *os.File) {
 				err := dst.Close()
 				if err != nil {
-					log2.Fatalf("Closing file error: %v", err)
+					log2.Errorf("Closing file error: %v", err)
 				}
 			}(dst)
-			_, err := io.Copy(dst, part)
+			_, err = io.Copy(dst, part)
 			if err != nil {
-				log2.Fatalf("Copy error: %v", err)
+				log2.Errorf("Copy error: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 			fileExt := path.Ext(pathFile + "/" + part.FileName())
 			if fileExt == ".csproj" {
@@ -135,19 +153,25 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 			if rt == "staging" {
 				_, err := me.Client.C_online.Database("neofura").Collection("VerifyContractModel").InsertOne(context.TODO(), verified)
 				if err != nil {
-					log2.Fatalf("Insert to online database error: %v", err)
+					log2.Errorf("Insert to online database error: %v", err)
+					http.Error(w, "Insert verified contract failed", http.StatusInternalServerError)
+					return
 				}
 			} else {
 				_, err := me.Client.C_online.Database("testneofura").Collection("VerifyContractModel").InsertOne(context.TODO(), verified)
 				if err != nil {
-					log2.Fatalf("Insert to online database eror: %v", err)
+					log2.Errorf("Insert to online database eror: %v", err)
+					http.Error(w, "Insert verified contract failed", http.StatusInternalServerError)
+					return
 				}
 			}
 			log2.Infof("Inserted a verified Contract in verifyContractModel collection in" + rt + " database")
 			//在ContractSourceCode表中，插入上传的合约源代码。
 			rd, err := ioutil.ReadDir(pathFile + "/")
 			if err != nil {
-				log2.Infof("ReadFile error: %v", err)
+				log2.Errorf("ReadFile error: %v", err)
+				http.Error(w, "Read source files failed", http.StatusInternalServerError)
+				return
 			}
 			for _, fi := range rd {
 				if fi.IsDir() {
@@ -156,39 +180,42 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 					log2.Infof("File name is: %v", fi.Name())
 					file, err := os.Open(pathFile + "/" + fi.Name())
 					if err != nil {
-						log2.Fatalf("Open file err: %v", err)
+						log2.Errorf("Open file err: %v", err)
+						continue
 					}
 					defer func(file *os.File) {
 						err := file.Close()
 						if err != nil {
-							log2.Fatalf("Closing file error: %v", err)
+							log2.Errorf("Closing file error: %v", err)
 						}
 					}(file)
 					fileInfo, err := file.Stat()
 					if err != nil {
-						log2.Fatalf("Stat file err: %v", err)
+						log2.Errorf("Stat file err: %v", err)
+						continue
 					}
 					fileSize := fileInfo.Size()
 					buffer := make([]byte, fileSize)
 					_, err = file.Read(buffer)
 					if err != nil {
-						log2.Fatalf("Read file err: %v", err)
-
+						log2.Errorf("Read file err: %v", err)
+						continue
 					}
 					sourceCode := insertContractSourceCode{getContract(m1), getUpdateCounter(m2), fi.Name(), string(buffer)}
 					if rt == "staging" {
 						_, err := me.Client.C_online.Database("neofura").Collection("ContractSourceCode").InsertOne(context.TODO(), sourceCode)
 						if err != nil {
-							log2.Fatalf("Insert to online database error: %v", err)
+							log2.Errorf("Insert to online database error: %v", err)
+							http.Error(w, "Insert contract source failed", http.StatusInternalServerError)
+							return
 						}
 					} else if rt == "test" {
 						_, err := me.Client.C_online.Database("testneofura").Collection("ContractSourceCode").InsertOne(context.TODO(), sourceCode)
 						if err != nil {
-							log2.Fatalf("Insert to online database error: %v", err)
+							log2.Errorf("Insert to online database error: %v", err)
+							http.Error(w, "Insert contract source failed", http.StatusInternalServerError)
+							return
 						}
-					}
-					if err != nil {
-						log2.Fatalf("Insert database error: %v", err)
 					}
 					log2.Infof("Inserted a contract source code in contractSourceCode collection in " + rt + "database")
 				}
@@ -198,11 +225,13 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			err = os.Rename(pathFile, getContract(m1))
 			if err != nil {
-				log2.Fatalf("Rename file error: %v", err)
+				log2.Errorf("Rename file error: %v", err)
+				http.Error(w, "Rename source directory failed", http.StatusInternalServerError)
+				return
 			}
 			_, err = w.Write(msg)
 			if err != nil {
-				log2.Fatalf("Writing message error: %v", err)
+				log2.Errorf("Writing message error: %v", err)
 			}
 			//如果合约存在于VerifiedContract表中，说明合约已经被验证过，不会存新的数据
 		} else {
@@ -212,11 +241,11 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			err := os.RemoveAll(pathFile)
 			if err != nil {
-				log2.Fatalf("Remove file error: %v", err)
+				log2.Errorf("Remove file error: %v", err)
 			}
 			_, err = w.Write(msg)
 			if err != nil {
-				log2.Fatalf("Write message error: %v", err)
+				log2.Errorf("Write message error: %v", err)
 			}
 		}
 
@@ -229,11 +258,11 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			err := os.RemoveAll(pathFile)
 			if err != nil {
-				log2.Fatalf("Remove file error: %v", err)
+				log2.Errorf("Remove file error: %v", err)
 			}
 			_, err = w.Write(msg)
 			if err != nil {
-				log2.Fatalf("Write message error: %v", err)
+				log2.Errorf("Write message error: %v", err)
 			}
 		} else {
 			log2.Info("Your source code doesn't match the contract on blockchain")
@@ -241,11 +270,11 @@ func (me *T) MultipleFile(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			err := os.RemoveAll(pathFile)
 			if err != nil {
-				log2.Fatalf("Remove file error: %v", err)
+				log2.Errorf("Remove file error: %v", err)
 			}
 			_, err = w.Write(msg)
 			if err != nil {
-				log2.Fatalf("Write message error: %v", err)
+				log2.Errorf("Write message error: %v", err)
 			}
 		}
 	}
@@ -258,22 +287,22 @@ func createDateDir(basepath string) string {
 	if _, err := os.Stat(folderPath); os.IsNotExist(err) {
 		err := os.Mkdir(folderPath, 0777)
 		if err != nil {
-			log2.Fatalf("Create dir error: %v", err)
+			log2.Errorf("Create dir error: %v", err)
 		}
 		err = os.Chmod(folderPath, 0777)
 		if err != nil {
-			log2.Fatalf("Chmod error: %v", err)
+			log2.Errorf("Chmod error: %v", err)
 		}
 	}
 	return folderPath
 }
 
-//编译用户上传的合约源码
+// 编译用户上传的合约源码
 func execCommand(pathFile string, w http.ResponseWriter, m map[string]string) string {
 	//cmd := exec.Command("ls")
 	//根据用户上传参数选择对应的编译器
 	cmd := exec.Command("echo")
- 
+
 	if getVersion(m) == "neo3-boa" {
 		cmd = exec.Command("/bin/sh", "-c", "/go/application/pythonExec.sh")
 		log2.Infof("Compiler: neo3-boa, Command: neo3-boa")
@@ -315,16 +344,16 @@ func execCommand(pathFile string, w http.ResponseWriter, m map[string]string) st
 			log2.Infof("Compiler: Neo.Compiler.CSharp 3.1.0, Command: nccs")
 		}
 	} else {
-		log2.Fatalf("Compiler version doesn't exist")
+		log2.Errorf("Compiler version doesn't exist")
 		msg, _ := json.Marshal(jsonResult{0, "Compiler version doesn't exist, please choose Neo.Compiler.CSharp 3.0.0/Neo.Compiler.CSharp 3.0.2/Neo.Compiler.CSharp 3.0.3 version"})
 		w.Header().Set("Content-Type", "application/json")
 		err := os.RemoveAll(pathFile)
 		if err != nil {
-			log2.Fatalf("Remove file error: %v", err)
+			log2.Errorf("Remove file error: %v", err)
 		}
 		_, err = w.Write(msg)
 		if err != nil {
-			log2.Fatalf("Write message error: %v", err)
+			log2.Errorf("Write message error: %v", err)
 		}
 		return "0"
 	}
@@ -332,12 +361,16 @@ func execCommand(pathFile string, w http.ResponseWriter, m map[string]string) st
 	cmd.Dir = pathFile + "/"
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log2.Fatalf("StdoutPipe error: %v", err)
+		log2.Errorf("StdoutPipe error: %v", err)
+		msg, _ := json.Marshal(jsonResult{1, "Cmd execution failed "})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(msg)
+		return "1"
 	}
 	defer func(stdout io.ReadCloser) {
 		err := stdout.Close()
 		if err != nil {
-			log2.Fatalf("Closing reader error: %v", err)
+			log2.Errorf("Closing reader error: %v", err)
 		}
 	}(stdout)
 
@@ -348,18 +381,22 @@ func execCommand(pathFile string, w http.ResponseWriter, m map[string]string) st
 		w.Header().Set("Content-Type", "application/json")
 		// err := os.RemoveAll(pathFile)
 		// if err != nil {
-		// log2.Fatalf("Remove file error: %v", err)
+		// log2.Errorf("Remove file error: %v", err)
 		// }
 		_, err = w.Write(msg)
 		if err != nil {
-			log2.Fatalf("Write message error: %v", err)
+			log2.Errorf("Write message error: %v", err)
 		}
 		return "1"
 	}
 
 	opBytes, err := ioutil.ReadAll(stdout)
 	if err != nil {
-		log2.Fatalf("Read error: %v", err)
+		log2.Errorf("Read error: %v", err)
+		msg, _ := json.Marshal(jsonResult{1, "Read compiler output failed"})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(msg)
+		return "1"
 	} else {
 		log2.Info(string(opBytes))
 	}
@@ -375,36 +412,52 @@ func execCommand(pathFile string, w http.ResponseWriter, m map[string]string) st
 		if getVersion(m) == "neo3-boa" {
 			f, err := ioutil.ReadFile(pathFile + "/" + m["Filename"] + ".nef")
 			if err != nil {
-				log2.Fatalf("err")
+				log2.Errorf("Read nef file error: %v", err)
+				msg, _ := json.Marshal(jsonResult{2, ".nef file doesn't exist "})
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(msg)
+				return "2"
 			}
 			res, err = nef.FileFromBytes(f)
 			if err != nil {
-				log2.Fatalf("error")
+				log2.Errorf("Parse nef file error: %v", err)
+				msg, _ := json.Marshal(jsonResult{2, ".nef parse failed"})
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(msg)
+				return "2"
 			}
 		} else {
 			f, err := ioutil.ReadFile(pathFile + "/" + "bin/sc/" + m["Filename"] + ".nef")
 			if err != nil {
-				log2.Fatalf("err")
+				log2.Errorf("Read nef file error: %v", err)
+				msg, _ := json.Marshal(jsonResult{2, ".nef file doesn't exist "})
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(msg)
+				return "2"
 			}
 			res, err = nef.FileFromBytes(f)
 			if err != nil {
-				log2.Fatalf("error")
+				log2.Errorf("Parse nef file error: %v", err)
+				msg, _ := json.Marshal(jsonResult{2, ".nef parse failed"})
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(msg)
+				return "2"
 			}
 		}
 
 		var result = base64.StdEncoding.EncodeToString(res.Script)
 		return result
 	} else {
-		log2.Fatalf(".nef file doesn't exist: %v", err)
+		log2.Errorf(".nef file doesn't exist: %v", err)
 		msg, _ := json.Marshal(jsonResult{2, ".nef file doesn't exist "})
 		w.Header().Set("Content-Type", "application/json")
 		//err := os.RemoveAll(pathFile)
 		//if err != nil {
-		//	log2.Fatalf("Remove file error: %v", err)
+		//	log2.Errorf("Remove file error: %v", err)
 		//}
 		_, err = w.Write(msg)
 		if err != nil {
-			log2.Fatalf("Write message error: %v", err)
+			log2.Errorf("Write message error: %v", err)
 		}
 		return "2"
 	}
@@ -442,12 +495,25 @@ func getContractState(pathFile string, w http.ResponseWriter, m1 map[string]stri
 		"id": 1,
 	}
 	payload, err := json.Marshal(params)
+	if err != nil {
+		log2.Errorf("Marshal RPC params error: %v", err)
+		msg, _ := json.Marshal(jsonResult{3, "RPC payload marshal failed"})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(msg)
+		return "", "3"
+	}
 	log2.Infof("RPC params: ContractHash: %v", getContract(m1))
 	switch rt {
 	case "staging":
-		resp, err = http.Post("https://neofura.ngd.network", "application/json", bytes.NewReader(payload))
+		resp, err = httpx.Post("https://neofura.ngd.network", "application/json", bytes.NewReader(payload))
 	case "test":
-		resp, err = http.Post("https://testneofura.ngd.network:444", "application/json", bytes.NewReader(payload))
+		resp, err = httpx.Post("https://testneofura.ngd.network:444", "application/json", bytes.NewReader(payload))
+	default:
+		log2.Errorf("runtime environment mismatch: %s", rt)
+		msg, _ := json.Marshal(jsonResult{3, "Runtime environment mismatch"})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(msg)
+		return "", "3"
 	}
 
 	if err != nil {
@@ -456,22 +522,29 @@ func getContractState(pathFile string, w http.ResponseWriter, m1 map[string]stri
 		w.Header().Set("Content-Type", "application/json")
 		err := os.RemoveAll(pathFile)
 		if err != nil {
-			log2.Fatalf("Remove file error: %v", err)
+			log2.Errorf("Remove file error: %v", err)
 		}
 		_, err = w.Write(msg)
 		if err != nil {
-			log2.Fatalf("Write message error: %v", err)
+			log2.Errorf("Write message error: %v", err)
 		}
 		return "", "3"
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-			log2.Fatalf("Closing reader error: %v", err)
+			log2.Errorf("Closing reader error: %v", err)
 		}
 	}(resp.Body)
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log2.Errorf("Read RPC response error: %v", err)
+		msg, _ := json.Marshal(jsonResult{3, "Read RPC response failed"})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(msg)
+		return "", "3"
+	}
 
 	if gjson.Get(string(body), "error").Exists() {
 		message := gjson.Get(string(body), "error.message").String()
@@ -480,11 +553,11 @@ func getContractState(pathFile string, w http.ResponseWriter, m1 map[string]stri
 		w.Header().Set("Content-Type", "application/json")
 		err := os.RemoveAll(pathFile)
 		if err != nil {
-			log2.Fatalf("Remove file error: %v", err)
+			log2.Errorf("Remove file error: %v", err)
 		}
 		_, err = w.Write(msg)
 		if err != nil {
-			log2.Fatalf("Write message error: %v", err)
+			log2.Errorf("Write message error: %v", err)
 		}
 		return "", "4"
 	}

@@ -12,7 +12,7 @@ import (
 	"os"
 )
 
-//每小时更新获取当天的交易数据
+// 每小时更新获取当天的交易数据
 func (me T) GetMarketHourlyVolume() error {
 	message := make(json.RawMessage, 0)
 	ret := &message
@@ -33,7 +33,8 @@ func (me T) GetMarketHourlyVolume() error {
 
 	assetList, err2 := me.GetNep11Asset()
 	if err2 != nil {
-		log2.Fatal("GetMarketNep11Asset err")
+		log2.Errorf("GetMarketNep11Asset err: %v", err2)
+		return err2
 	}
 
 	for _, it := range assetList {
@@ -62,7 +63,8 @@ func (me T) GetMarketHourlyVolume() error {
 			}, ret)
 
 		if err != nil {
-			log2.Fatal("Get Market transaction err: ", err)
+			log2.Errorf("Get Market transaction err: %v", err)
+			continue
 		}
 		assetResult := make(map[string]interface{})
 		date := time.UnixMilli(today).Format(consts.ShortForm)
@@ -87,7 +89,8 @@ func (me T) GetMarketHourlyVolume() error {
 						toAmount, err = TokenConversion(auctionAsset, amount, consts.BNEO_Test)
 					}
 					if err != nil {
-						log2.Fatal("tokenConversion err:", err)
+						log2.Errorf("tokenConversion err: %v", err)
+						continue
 					}
 
 				} else if eventname == "CompleteOffer" {
@@ -100,7 +103,8 @@ func (me T) GetMarketHourlyVolume() error {
 						toAmount, err = TokenConversion(offerAsset, amount, consts.BNEO_Test)
 					}
 					if err != nil {
-						log2.Fatal("tokenCOnversion err:", err)
+						log2.Errorf("tokenCOnversion err: %v", err)
+						continue
 					}
 				}
 				dayVolume = dayVolume.Add(dayVolume, toAmount)
@@ -126,7 +130,8 @@ func (me T) GetMarketHourlyVolume() error {
 			Filter     bson.M
 		}{Collection: "MarketDayVolume", Data: assetResult, Filter: bson.M{"asset": it, "date": dateTime}})
 		if err != nil {
-			log2.Fatal("MarketDayVolume update err")
+			log2.Errorf("MarketDayVolume update err: %v", err)
+			continue
 		}
 
 	}

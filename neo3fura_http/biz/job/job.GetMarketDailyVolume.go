@@ -2,7 +2,6 @@ package job
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -33,12 +32,12 @@ func (me T) GetMarketDailyVolume() {
 
 	assetList, err2 := me.GetNep11Asset()
 	if err2 != nil {
-		log2.Fatal("GetMarketNep11Asset err")
+		log2.Errorf("GetMarketNep11Asset err: %v", err2)
+		return
 	}
 
 	for _, it := range assetList {
 		//获取上架记录
-		fmt.Println(it)
 		r2, err := me.Client.QueryAggregate(
 			struct {
 				Collection string
@@ -63,7 +62,8 @@ func (me T) GetMarketDailyVolume() {
 			}, ret)
 
 		if err != nil {
-			log2.Fatal("Get Market transaction err: ", err)
+			log2.Errorf("Get Market transaction err: %v", err)
+			continue
 		}
 		assetResult := make(map[string]interface{})
 		lastday := currentTime - 60*60*1000
@@ -88,7 +88,8 @@ func (me T) GetMarketDailyVolume() {
 						toAmount, err = TokenConversion(auctionAsset, amount, consts.BNEO_Test)
 					}
 					if err != nil {
-						log2.Fatal("tokenConversion err:", err)
+						log2.Errorf("tokenConversion err: %v", err)
+						continue
 					}
 
 				} else if eventname == "CompleteOffer" {
@@ -100,9 +101,9 @@ func (me T) GetMarketDailyVolume() {
 					} else {
 						toAmount, err = TokenConversion(offerAsset, amount, consts.BNEO_Test)
 					}
-					fmt.Println("completeOffer :", toAmount)
 					if err != nil {
-						log2.Fatal("tokenCOnversion err:", err)
+						log2.Errorf("tokenCOnversion err: %v", err)
+						continue
 					}
 				}
 				dayVolume = dayVolume.Add(dayVolume, toAmount)
@@ -128,14 +129,15 @@ func (me T) GetMarketDailyVolume() {
 			Filter     bson.M
 		}{Collection: "MarketDayVolume", Data: assetResult, Filter: bson.M{"asset": it, "date": date}})
 		if err != nil {
-			log2.Fatal("MarketDayVolume update err")
+			log2.Errorf("MarketDayVolume update err: %v", err)
+			continue
 		}
 
 	}
 
 }
 
-//token
+// token
 func TokenConversion(from string, amount *big.Int, to string) (*big.Float, error) {
 	if from == to {
 		return new(big.Float).SetInt(amount), nil
