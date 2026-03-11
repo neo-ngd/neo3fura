@@ -5,8 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/joeqian10/neo3-gogogo/crypto"
-	"github.com/joeqian10/neo3-gogogo/helper"
 	"io/ioutil"
 	"neo3fura_http/lib/httpx"
 	"neo3fura_http/lib/joh"
@@ -14,6 +12,10 @@ import (
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/strval"
 	"neo3fura_http/var/stderr"
+
+	"github.com/joeqian10/neo3-gogogo/crypto"
+	"github.com/joeqian10/neo3-gogogo/helper"
+
 	//"go.mongodb.org/mongo-driver/bson"
 	"net/http"
 	//"strconv"
@@ -165,7 +167,8 @@ func (me *T) getNep11PropertiesByContract(asset string, tokenid string) (map[str
 		//fmt.Printf(aa)
 
 		var value_result interface{}
-		if value_key == "ByteString" {
+		switch value_key {
+		case "ByteString":
 			value_pre := it["value"].(map[string]interface{})["value"].(string)
 
 			value_decode, err := crypto.Base64Decode(value_pre)
@@ -184,7 +187,7 @@ func (me *T) getNep11PropertiesByContract(asset string, tokenid string) (map[str
 				}
 			}
 
-		} else if value_key == "Map" {
+		case "Map":
 			valueArray := it["value"].(map[string]interface{})["value"].([]interface{})
 
 			mapresult := make([]map[string]interface{}, 0)
@@ -225,7 +228,7 @@ func (me *T) getNep11PropertiesByContract(asset string, tokenid string) (map[str
 			}
 
 			value_result = mapresult
-		} else {
+		default:
 			value_result = it["value"].(map[string]interface{})["value"]
 		}
 

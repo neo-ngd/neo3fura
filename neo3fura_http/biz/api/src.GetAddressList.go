@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"neo3fura_http/lib/type/consts"
+	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -11,11 +12,28 @@ import (
 func (me *T) GetAddressList(args struct {
 	Limit  int64
 	Skip   int64
+	Cursor string
 	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.Limit <= 0 {
-		args.Limit = 20
+		args.Limit = consts.DefaultLimit
 	}
+	if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
+	if args.Skip < 0 {
+		args.Skip = 0
+	}
+	cursorFilter := bson.M{}
+	if args.Cursor != "" {
+		decodedFilter, err := buildIntDescCursorFilter("firstusetime", args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = decodedFilter
+		args.Skip = 0
+	}
+	queryLimit := args.Limit + 1
 
 	r1, err := me.Client.QueryAggregate(struct {
 		Collection string
@@ -30,7 +48,10 @@ func (me *T) GetAddressList(args struct {
 		Sort:       bson.M{},
 		Filter:     bson.M{},
 		Pipeline: []bson.M{
-			bson.M{"$sort": bson.M{"firstusetime": -1}},
+			bson.M{"$match": cursorFilter},
+			bson.M{"$sort": bson.M{"firstusetime": -1, "_id": -1}},
+			bson.M{"$skip": args.Skip},
+			bson.M{"$limit": queryLimit},
 			bson.M{"$lookup": bson.M{
 				"from": "Address-Asset",
 				"let":  bson.M{"address": "$address"},
@@ -77,9 +98,6 @@ func (me *T) GetAddressList(args struct {
 				},
 				"as": "nep11transfer"},
 			},
-
-			bson.M{"$skip": args.Skip},
-			bson.M{"$limit": args.Limit},
 		},
 		Query: []string{},
 	}, ret)
@@ -87,7 +105,13 @@ func (me *T) GetAddressList(args struct {
 		return err
 	}
 
-	for _, item := range r1 {
+	hasNext := int64(len(r1)) > args.Limit
+	page := r1
+	if hasNext {
+		page = r1[:args.Limit]
+	}
+
+	for _, item := range page {
 		nep17balance := item["nep17balance"].(primitive.A)
 		nep17transfer := item["nep17transfer"].(primitive.A)
 		nep11transfer := item["nep11transfer"].(primitive.A)
@@ -136,9 +160,25 @@ func (me *T) GetAddressList(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(r1, count["total counts"].(int64), args.Filter)
+	r2, err := me.FilterArrayAndAppendCount(page, count["total counts"].(int64), args.Filter)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		sortValue, ok := int64FromAny(last["firstusetime"])
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeIntDescCursor(sortValue, oid)
+		if err != nil {
+			return err
+		}
+		r2["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {

@@ -2,12 +2,15 @@
 Gets the transaction list.
 <hr>
 
+> Pagination recommendation: new clients should use `Cursor` first. `Skip` is for backward compatibility only.
+
 ### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor  | string| Cursor-based pagination token. When provided, `Skip` is ignored.| Optional |
 
 
 ### Example
@@ -21,6 +24,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetTransactionList",
   "params": {"Limit":2,"Skip":2},
+  "id": 1
+}'
+```
+
+Cursor request example:
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetTransactionList",
+  "params": {"Limit":50,"Cursor":"<nextCursor from previous page>"},
   "id": 1
 }'
 ```
@@ -89,7 +105,8 @@ Response body
         ]
       }
     ],
-    "totalCount": 35885
+    "totalCount": 35885,
+    "nextCursor": "eyJzdiI6MTYzNTE1MDgzOTc0OSwiaWQiOiI2MTc2NmJmNzUwMDI1YjAxNjEyZGNkNTkifQ"
   },
   "error": null
 }

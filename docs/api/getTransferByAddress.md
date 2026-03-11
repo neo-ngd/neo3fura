@@ -9,6 +9,7 @@ Gets the transfer by the user's address
 | Address    | string|  The user's address| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor  | string| Cursor-based pagination token. When provided, `Skip` is ignored.| Optional |
 
 
 ### Example
@@ -22,6 +23,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetTransferByAddress",
   "params": {"Limit":2,"Skip":2,"Address":"0xb31b1ef4b504f5413dbed7e6e58fd11dedb6f4ab"},
+  "id": 1
+}'
+```
+
+Cursor request example:
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetTransferByAddress",
+  "params": {"Limit":50,"Address":"0xb31b1ef4b504f5413dbed7e6e58fd11dedb6f4ab","Cursor":"<nextCursor from previous page>"},
   "id": 1
 }'
 ```
@@ -60,7 +74,8 @@ Response body
         "value": "1"
       }
     ],
-    "totalCount": 537
+    "totalCount": 537,
+    "nextCursor": "eyJzdiI6MTYzMjI3ODE4MDQzOCwiaWQiOiI2MTRjMzkzMjMwNjY5MzgzNDQ4NDMyOGQifQ"
   },
   "error": null
 }

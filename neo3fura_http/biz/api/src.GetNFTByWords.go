@@ -10,10 +10,45 @@ import (
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/strval"
 	"neo3fura_http/var/stderr"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+func getNFTWordsLookupPipeline(words strval.T) []bson.M {
+	pattern := "\"name\"\\s*:\\s*\"" + regexp.QuoteMeta(string(words))
+	return []bson.M{
+		bson.M{"$match": bson.M{"$expr": bson.M{"$and": []interface{}{
+			bson.M{"$eq": []interface{}{"$tokenid", "$$tokenid"}},
+			bson.M{"$eq": []interface{}{"$asset", "$$asset"}},
+		}}}},
+		bson.M{"$match": bson.M{
+			"properties": bson.M{"$regex": pattern, "$options": "i"},
+		}},
+		bson.M{"$project": bson.M{"id": 1, "tokenid": 1, "asset": 1, "properties": 1}},
+		bson.M{"$limit": int64(1)},
+	}
+}
+
+func aggregateCount(results []map[string]interface{}, field string) int64 {
+	if len(results) == 0 {
+		return 0
+	}
+	raw := results[0][field]
+	switch v := raw.(type) {
+	case int:
+		return int64(v)
+	case int32:
+		return int64(v)
+	case int64:
+		return v
+	case float64:
+		return int64(v)
+	default:
+		return 0
+	}
+}
 
 func (me *T) GetNFTByWords(args struct {
 	SecondaryMarket h160.T //
@@ -86,19 +121,10 @@ func (me *T) GetNFTByWords(args struct {
 				bson.M{"$match": bson.M{"market": bson.M{"$ne": args.PrimaryMarket.Val()}}},
 				bson.M{"$match": bson.M{"amount": bson.M{"$gt": 0}}},
 				bson.M{"$lookup": bson.M{
-					"from": "Nep11Properties",
-					"let":  bson.M{"asset": "$asset", "tokenid": "$tokenid"},
-					"pipeline": []bson.M{
-						bson.M{"$match": bson.M{"$or": []interface{}{
-							bson.M{"properties": bson.M{"$regex": "name\":\"" + args.Words, "$options": "$i"}},
-							bson.M{"properties": bson.M{"$regex": "name\": \"" + args.Words, "$options": "$i"}},
-						}}},
-						bson.M{"$match": bson.M{"$expr": bson.M{"$and": []interface{}{
-							bson.M{"$eq": []interface{}{"$tokenid", "$$tokenid"}},
-							bson.M{"$eq": []interface{}{"$asset", "$$asset"}},
-						}}}},
-						bson.M{"$project": bson.M{"id": 1, "tokenid": 1, "asset": 1, "properties": 1}}},
-					"as": "properties"},
+					"from":     "Nep11Properties",
+					"let":      bson.M{"asset": "$asset", "tokenid": "$tokenid"},
+					"pipeline": getNFTWordsLookupPipeline(args.Words),
+					"as":       "properties"},
 				},
 				bson.M{"$match": bson.M{"properties": bson.M{"$ne": []interface{}{}}}}, //过滤空的集合
 				bson.M{"$skip": args.Skip},
@@ -297,22 +323,13 @@ func (me *T) GetNFTByWords(args struct {
 				bson.M{"$match": bson.M{"market": bson.M{"$ne": args.PrimaryMarket.Val()}}},
 				bson.M{"$match": bson.M{"amount": bson.M{"$gt": 0}}},
 				bson.M{"$lookup": bson.M{
-					"from": "Nep11Properties",
-					"let":  bson.M{"asset": "$asset", "tokenid": "$tokenid"},
-					"pipeline": []bson.M{
-						bson.M{"$match": bson.M{"$or": []interface{}{
-							bson.M{"properties": bson.M{"$regex": "name\":\"" + args.Words, "$options": "$i"}},
-							bson.M{"properties": bson.M{"$regex": "name\": \"" + args.Words, "$options": "$i"}},
-						}}},
-						bson.M{"$match": bson.M{"$expr": bson.M{"$and": []interface{}{
-							bson.M{"$eq": []interface{}{"$tokenid", "$$tokenid"}},
-							bson.M{"$eq": []interface{}{"$asset", "$$asset"}},
-						}}}},
-						bson.M{"$project": bson.M{"id": 1, "tokenid": 1, "asset": 1, "properties": 1}}},
-					"as": "properties"},
+					"from":     "Nep11Properties",
+					"let":      bson.M{"asset": "$asset", "tokenid": "$tokenid"},
+					"pipeline": getNFTWordsLookupPipeline(args.Words),
+					"as":       "properties"},
 				},
 				bson.M{"$match": bson.M{"properties": bson.M{"$ne": []interface{}{}}}}, //过滤空的集合
-
+				bson.M{"$count": "total"},
 			},
 
 			Query: []string{},
@@ -320,7 +337,7 @@ func (me *T) GetNFTByWords(args struct {
 	if err2 != nil {
 		return err2
 	}
-	count := len(r2)
+	count := aggregateCount(r2, "total")
 
 	r3, err := me.FilterAggragateAndAppendCount(r1, count, args.Filter)
 

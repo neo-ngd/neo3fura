@@ -1,31 +1,28 @@
-# GetNFTRecordByContractHashTokenId
+# GetNFTByContractHashTokenId
 Gets the NFT token information by the contract hash and tokenId.
 <hr>
 
 ### Parameters
 
-|    Name    | Type | Description | Required |
-| ---------- | --- |    ------    | ----|
-| ContractHash     | string| The contract hash | Required |
-| MarketHash     | string| The  marketplace hash | Optional |
-| TokenIds    | Array| Array of NFT token id| Optional |
+| Name | Type | Description | Required |
+| --- | --- | --- | --- |
+| ContractHash | string | NFT contract hash | Required |
+| TokenIds | array | NFT token id list. Empty means query by contract scope. | Optional |
 
 ### Example
 
 Request body
 
 ```powershell
-curl --location --request GET 'https://testneofura.ngd.network:444' \
---header 'Content-Type: text/plain' \
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
 --data-raw '{
   "jsonrpc": "2.0",
   "method": "GetNFTByContractHashTokenId",
   "params": {
-      "ContractHash":"0xc7b11b46f97bda7a8c82793841abba120e96695b",     
-      "TokenIds":["LzKk2aeLybZTv83Hzw8djcvJJyVldIyi8oly1qqmqUo="],
-      "MarketHash":""
-      
-      },
+    "ContractHash":"0xc7b11b46f97bda7a8c82793841abba120e96695b",
+    "TokenIds":["LzKk2aeLybZTv83Hzw8djcvJJyVldIyi8oly1qqmqUo="]
+  },
   "id": 1
 }
 '
@@ -60,4 +57,3 @@ Response body
   "error": null
 }
 ```
-
