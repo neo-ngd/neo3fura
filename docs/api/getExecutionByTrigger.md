@@ -9,6 +9,7 @@ Gets the execution by the given trigger
 | Trigger    | enum|  Triggers in OnPersist, PostPersist, Application, Verification, System, All| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -22,6 +23,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetExecutionByTrigger",
   "params": {"Trigger":"Application","Limit":2},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetExecutionByTrigger",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -56,7 +70,8 @@ Response body
         "vmstate": "HALT"
       }
     ],
-    "totalCount": 86342
+    "totalCount": 86342,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

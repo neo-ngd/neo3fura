@@ -96,7 +96,7 @@ func (me *T) GetAssetInfoByContractHash(args struct {
 		}
 	}
 
-	_, count, err := me.Client.QueryAll(struct {
+	_, count, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -104,12 +104,14 @@ func (me *T) GetAssetInfoByContractHash(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Address-Asset",
 		Index:      "GetAssetInfos",
 		Sort:       bson.M{},
 		Filter:     bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}},
 		Query:      []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err

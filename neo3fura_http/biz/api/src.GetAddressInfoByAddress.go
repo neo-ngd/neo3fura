@@ -31,7 +31,7 @@ func (me *T) GetAddressInfoByAddress(args struct {
 	if err != nil {
 		return err
 	}
-	_, count, err := me.Client.QueryAll(struct {
+	_, count, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -39,12 +39,14 @@ func (me *T) GetAddressInfoByAddress(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Transaction",
 		Index:      "GetAddressInfoByAddress",
 		Sort:       bson.M{},
 		Filter:     bson.M{"sender": args.Address.TransferAddress()},
 		Query:      []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err

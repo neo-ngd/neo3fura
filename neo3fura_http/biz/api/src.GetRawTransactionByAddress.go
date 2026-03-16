@@ -23,47 +23,37 @@ func (me *T) GetRawTransactionByAddress(args struct {
 	if args.Address.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-	if args.Limit <= 0 {
-		args.Limit = consts.DefaultLimit
-	}
-	if args.Limit > consts.MaxLimit {
-		args.Limit = consts.MaxLimit
-	}
-	if args.Skip < 0 {
-		args.Skip = 0
-	}
-	filter := bson.M{"sender": args.Address.TransferAddress()}
+
+	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
+
+	var cursorFilter bson.M
 	if args.Cursor != "" {
-		cursorFilter, err := buildOIDDescCursorFilter(args.Cursor)
+		cursorValues, err := DecodeCursor(args.Cursor)
 		if err != nil {
 			return err
 		}
-		filter = bson.M{
-			"$and": []bson.M{
-				{"sender": args.Address.TransferAddress()},
-				cursorFilter,
-			},
-		}
-		args.Skip = 0
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
 	}
-	queryLimit := args.Limit + 1
 
-	r1, count, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Transaction",
-		Index:      "GetRawTransactionByAddress",
-		Sort:       bson.M{"_id": -1},
-		Filter:     filter,
-		Query:      []string{},
-		Limit:      queryLimit,
-		Skip:       args.Skip,
+		Collection:   "Transaction",
+		Index:        "GetRawTransactionByAddress",
+		Sort:         bson.M{"_id": -1},
+		Filter:       bson.M{"sender": args.Address.TransferAddress()},
+		Query:        []string{},
+		Limit:        args.Limit,
+		Skip:         args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err != nil {
 		return err
@@ -105,7 +95,7 @@ func (me *T) GetRawTransactionByAddress(args struct {
 		}
 	}
 
-	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

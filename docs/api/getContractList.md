@@ -7,6 +7,7 @@ Gets the contract list
 | ---------- | --- |    ------    | ----|
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
@@ -47,7 +48,8 @@ Response body
                 "updatecounter": 0
             }
         ],
-            "totalCount": 278
+            "totalCount": 278,
+        "nextCursor": "eyJmIjp7...}}"
     },
     "error": null
 }

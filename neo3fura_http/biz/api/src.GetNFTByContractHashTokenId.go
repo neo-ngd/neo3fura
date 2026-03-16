@@ -34,6 +34,7 @@ func (me *T) GetNFTByContractHashTokenId(args struct {
 			ContractHash h160.T
 			Limit        int64
 			Skip         int64
+			Cursor       string
 			Filter       map[string]interface{}
 			Raw          *[]map[string]interface{}
 		}{ContractHash: args.ContractHash, Raw: &raw1}, ret)
@@ -348,7 +349,7 @@ func (me *T) GetNFTByContractHashTokenId(args struct {
 		}
 	}
 
-	r5, err := me.FilterArrayAndAppendCount(rr1, int64(len(rr1)), args.Filter)
+	r5, err := me.FilterArrayAndAppendCountWithCursor(rr1, int64(len(rr1)), args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

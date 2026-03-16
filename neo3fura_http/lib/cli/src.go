@@ -322,6 +322,84 @@ func (me *T) QueryAll(args struct {
 	return convert, count, nil
 }
 
+// QueryAllWithCursor is like QueryAll but supports cursor-based pagination.
+// When CursorFilter is non-nil, it is merged with Filter using $and, and Skip is ignored (set to 0).
+func (me *T) QueryAllWithCursor(args struct {
+	Collection   string
+	Index        string
+	Sort         bson.M
+	Filter       bson.M
+	Query        []string
+	Limit        int64
+	Skip         int64
+	CursorFilter bson.M
+}, ret *json.RawMessage) ([]map[string]interface{}, int64, error) {
+
+	if args.Limit == 0 {
+		args.Limit = consts.DefaultLimit
+	} else if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
+
+	// Merge cursor filter if provided
+	queryFilter := args.Filter
+	skip := args.Skip
+	if args.CursorFilter != nil {
+		if queryFilter == nil || len(queryFilter) == 0 {
+			queryFilter = args.CursorFilter
+		} else {
+			queryFilter = bson.M{"$and": []interface{}{args.Filter, args.CursorFilter}}
+		}
+		skip = 0
+	}
+
+	var results []map[string]interface{}
+	convert := make([]map[string]interface{}, 0)
+	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
+	op := options.Find()
+	op.SetSort(args.Sort)
+	op.SetLimit(args.Limit)
+	op.SetSkip(skip)
+	co := options.CountOptions{}
+	// Count uses original filter (without cursor) for total count
+	count, err := collection.CountDocuments(me.Ctx, args.Filter, &co)
+	if err != nil {
+		return nil, 0, stderr.ErrFind
+	}
+	cursor, err := collection.Find(me.Ctx, queryFilter, op)
+	if err == mongo.ErrNoDocuments {
+		return nil, 0, stderr.ErrNotFound
+	}
+	if err != nil {
+		return nil, 0, stderr.ErrFind
+	}
+	defer func() {
+		if err := cursor.Close(me.Ctx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
+		}
+	}()
+	if err = cursor.All(me.Ctx, &results); err != nil {
+		return nil, 0, stderr.ErrFind
+	}
+	for _, item := range results {
+		if len(args.Query) == 0 {
+			convert = append(convert, item)
+		} else {
+			temp := make(map[string]interface{})
+			for _, v := range args.Query {
+				temp[v] = item[v]
+			}
+			convert = append(convert, temp)
+		}
+	}
+	r, err := json.Marshal(convert)
+	if err != nil {
+		return nil, 0, stderr.ErrFind
+	}
+	*ret = json.RawMessage(r)
+	return convert, count, nil
+}
+
 func (me *T) SaveJob(args struct {
 	Collection string
 	Data       bson.M

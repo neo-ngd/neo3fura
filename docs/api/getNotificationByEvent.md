@@ -9,6 +9,7 @@ Gets the notification by event
 | Event    | string|  The name of event eg:"transfer"| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -22,6 +23,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetNotificationByEvent",
   "params": {"Event": "Transfer","Limit":2},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetNotificationByEvent",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -88,7 +102,8 @@ Response body
                 "txid": "0x0000000000000000000000000000000000000000000000000000000000000000"
             }
         ],
-            "totalCount": 692396
+            "totalCount": 692396,
+        "nextCursor": "eyJmIjp7...}}"
     },
     "error": null
 }

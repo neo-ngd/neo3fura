@@ -28,7 +28,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 }'
 ```
 
-Cursor request example:
+Request body (with cursor)
 
 ```powershell
 curl --location --request POST 'https://testneofura.ngd.network:444' \
@@ -36,7 +36,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 --data-raw '{
   "jsonrpc": "2.0",
   "method": "GetTransactionList",
-  "params": {"Limit":50,"Cursor":"<nextCursor from previous page>"},
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -106,7 +106,7 @@ Response body
       }
     ],
     "totalCount": 35885,
-    "nextCursor": "eyJzdiI6MTYzNTE1MDgzOTc0OSwiaWQiOiI2MTc2NmJmNzUwMDI1YjAxNjEyZGNkNTkifQ"
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

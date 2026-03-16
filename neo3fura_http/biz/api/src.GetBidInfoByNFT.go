@@ -48,7 +48,7 @@ func (me *T) GetBidInfoByNFT(args struct {
 		}
 	}
 
-	rs, count, err := me.Client.QueryAll(struct {
+	rs, count, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -56,6 +56,7 @@ func (me *T) GetBidInfoByNFT(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "MarketNotification",
 		Index:      "GetBidInfoByNFT",
@@ -63,6 +64,7 @@ func (me *T) GetBidInfoByNFT(args struct {
 		Filter:     f,
 		Query:      []string{},
 		Limit:      1,
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
@@ -72,7 +74,7 @@ func (me *T) GetBidInfoByNFT(args struct {
 		f["nonce"] = lastNonce
 	}
 
-	r1, count, err := me.Client.QueryAll(struct {
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -80,12 +82,14 @@ func (me *T) GetBidInfoByNFT(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "MarketNotification",
 		Index:      "GetBidInfoByNFT",
 		Sort:       bson.M{"timestamp": -1},
 		Filter:     f,
 		Query:      []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
@@ -114,7 +118,7 @@ func (me *T) GetBidInfoByNFT(args struct {
 		}
 		result = append(result, rr)
 	}
-	r2, err := me.FilterArrayAndAppendCount(result, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(result, count, args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

@@ -38,6 +38,7 @@ func (me *T) Getblock(args []interface{}, ret *json.RawMessage) error {
 			BlockHash h256.T
 			Limit     int64
 			Skip      int64
+			Cursor    string
 			Filter    map[string]interface{}
 			Raw       *[]map[string]interface{}
 		}{BlockHash: blockHash, Raw: &raw2}, ret)
@@ -74,6 +75,7 @@ func (me *T) Getblock(args []interface{}, ret *json.RawMessage) error {
 			BlockHeight uintval.T
 			Limit       int64
 			Skip        int64
+			Cursor      string
 			Filter      map[string]interface{}
 			Raw         *[]map[string]interface{}
 		}{BlockHeight: blockHeight, Raw: &raw2}, ret)

@@ -27,7 +27,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 '
 ```
 
-Cursor request example:
+Request body (with cursor)
 
 ```powershell
 curl --location --request POST 'https://testneofura.ngd.network:444' \
@@ -120,7 +120,7 @@ Response body
             }
         ],
             "totalCount": 20,
-            "nextCursor": "eyJpZCI6IjYxNGMzMmFhYTE0MTExODQzNTZhMzc3ZCJ9"
+        "nextCursor": "eyJmIjp7...}}"
     },
     "error": null
 }

@@ -24,84 +24,49 @@ func (me *T) GetTransferByAddress(args struct {
 	if args.Limit <= 0 {
 		args.Limit = consts.DefaultLimit
 	}
-	if args.Limit > consts.MaxLimit {
-		args.Limit = consts.MaxLimit
-	}
-	if args.Skip < 0 {
-		args.Skip = 0
-	}
-	baseFilter := bson.M{"$or": []interface{}{
-		bson.M{"from": args.Address.TransferredVal()},
-		bson.M{"to": args.Address.TransferredVal()},
-	}}
-	queryFilter := bson.M{}
-	if args.Cursor != "" {
-		cursorFilter, err := buildIntDescCursorFilter("timestamp", args.Cursor)
-		if err != nil {
-			return err
-		}
-		queryFilter = bson.M{
-			"$and": []interface{}{
-				baseFilter,
-				cursorFilter,
-			},
-		}
-		args.Skip = 0
-	} else {
-		queryFilter = baseFilter
-	}
-	queryLimit := args.Limit + 1
-
-	// In compatibility mode, query each collection separately and merge in memory.
-	// This avoids relying on $unionWith on older MongoDB deployments.
-	fetchLimit := args.Skip + queryLimit
-	if fetchLimit < queryLimit {
-		fetchLimit = queryLimit
-	}
-
-	nep11Pipeline := []bson.M{
-		bson.M{"$match": queryFilter},
-		bson.M{"$sort": bson.M{"timestamp": -1, "_id": -1}},
-		bson.M{"$limit": fetchLimit},
-	}
-	r1, err := me.Client.QueryAggregate(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Pipeline   []bson.M
-		Query      []string
+	r1, _, err1 := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
 		Collection: "Nep11TransferNotification",
 		Index:      "GetTransferByAddress",
 		Sort:       bson.M{},
-		Filter:     bson.M{},
-		Pipeline:   nep11Pipeline,
-		Query:      []string{},
+		Filter: bson.M{"$or": []interface{}{
+			bson.M{"from": args.Address.TransferredVal()},
+			bson.M{"to": args.Address.TransferredVal()},
+		}},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
 	}
 
-	nep17Pipeline := []bson.M{
-		bson.M{"$match": queryFilter},
-		bson.M{"$sort": bson.M{"timestamp": -1, "_id": -1}},
-		bson.M{"$limit": fetchLimit},
-	}
-	r2, err := me.Client.QueryAggregate(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Pipeline   []bson.M
-		Query      []string
+	r2, _, err2 := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
 		Collection: "TransferNotification",
 		Index:      "GetTransferByAddress",
 		Sort:       bson.M{},
-		Filter:     bson.M{},
-		Pipeline:   nep17Pipeline,
-		Query:      []string{},
+		Filter: bson.M{"$or": []interface{}{
+			bson.M{"from": args.Address.TransferredVal()},
+			bson.M{"to": args.Address.TransferredVal()},
+		}},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
@@ -166,9 +131,10 @@ func (me *T) GetTransferByAddress(args struct {
 	if err != nil {
 		return err
 	}
-	totalCount := nep11CountRow["total counts"].(int64) + nep17CountRow["total counts"].(int64)
 
-	r5, err := me.FilterArrayAndAppendCount(page, totalCount, args.Filter)
+	sortKeys := []string{"_id"}
+
+	r5, err := me.FilterArrayAndAppendCountWithCursor(r4, int64(len(r3)), args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

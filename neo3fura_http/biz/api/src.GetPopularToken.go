@@ -26,7 +26,7 @@ func (me *T) GetPopularToken(args struct {
 		return err
 	}
 	popularTokens := r1["Populars"]
-	r2, _, err := me.Client.QueryAll(struct {
+	r2, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -34,12 +34,14 @@ func (me *T) GetPopularToken(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Asset",
 		Index:      "GetPopularAsset",
 		Sort:       bson.M{},
 		Filter:     bson.M{"type": args.Standard.Val(), "hash": bson.M{"$in": popularTokens}},
 		Query:      []string{},
+		CursorFilter: nil,
 	}, ret)
 
 	for _, item := range r2 {
@@ -72,7 +74,7 @@ func (me *T) GetPopularToken(args struct {
 		r2 = append(r2, item)
 	}
 
-	r4, err := me.FilterArrayAndAppendCount(r2, int64(len(r2)), args.Filter)
+	r4, err := me.FilterArrayAndAppendCountWithCursor(r2, int64(len(r2)), args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

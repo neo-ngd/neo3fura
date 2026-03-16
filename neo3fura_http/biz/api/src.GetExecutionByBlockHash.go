@@ -15,25 +15,27 @@ func (me *T) GetExecutionByBlockHash(args struct {
 	if args.BlockHash.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-	r1, count, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Execution",
-		Index:      "GetExecutionByBlockHash",
-		Sort:       bson.M{},
-		Filter:     bson.M{"blockhash": args.BlockHash.Val()},
-		Query:      []string{},
+		Collection:   "Execution",
+		Index:        "GetExecutionByBlockHash",
+		Sort:         bson.M{},
+		Filter:       bson.M{"blockhash": args.BlockHash.Val()},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

@@ -26,6 +26,7 @@ func (me *T) GetNFTRecordByAddress(args struct {
 	PrimaryMarket   h160.T
 	Limit           int64
 	Skip            int64
+	Cursor          string
 	Filter          map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.Address.Valid() == false {
@@ -69,20 +70,22 @@ func (me *T) GetNFTRecordByAddress(args struct {
 	result := make([]map[string]interface{}, 0)
 
 	//获取某个用户对NFT所有操作
-	r1, _, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "MarketNotification",
-		Index:      "GetNFTRecordByAddress",
-		Sort:       bson.M{},
-		Filter:     f,
-		Query:      []string{},
+		Collection:   "MarketNotification",
+		Index:        "GetNFTRecordByAddress",
+		Sort:         bson.M{},
+		Filter:       f,
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
@@ -190,7 +193,7 @@ func (me *T) GetNFTRecordByAddress(args struct {
 						tokenid1 := item["tokenid"]
 						asset1 := item["asset"]
 
-						rr1, count, err14 := me.Client.QueryAll(struct {
+						rr1, count, err14 := me.Client.QueryAllWithCursor(struct {
 							Collection string
 							Index      string
 							Sort       bson.M
@@ -198,12 +201,14 @@ func (me *T) GetNFTRecordByAddress(args struct {
 							Query      []string
 							Limit      int64
 							Skip       int64
+						CursorFilter bson.M
 						}{
 							Collection: "MarketNotification",
 							Index:      "someindex",
 							Sort:       bson.M{},
 							Filter:     bson.M{"nonce": nonce1, "eventname": "Claim", "asset": asset1, "tokenid": tokenid1, "market": bson.M{"$in": []interface{}{args.SecondaryMarket, args.PrimaryMarket}}},
 							Query:      []string{},
+							CursorFilter: nil,
 						}, ret)
 						if err14 != nil {
 							return err14
@@ -561,7 +566,7 @@ func (me *T) GetNFTRecordByAddress(args struct {
 		}
 	}
 
-	r3, _, err := me.Client.QueryAll(struct {
+	r3, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -569,12 +574,14 @@ func (me *T) GetNFTRecordByAddress(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+	CursorFilter bson.M
 	}{
 		Collection: "Nep11TransferNotification",
 		Index:      "GetNep11TransferByAddress",
 		Sort:       bson.M{},
 		Filter:     filter,
 		Query:      []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
@@ -688,7 +695,7 @@ func (me *T) GetNFTRecordByAddress(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(pagedNFT, num, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(pagedNFT, num, args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

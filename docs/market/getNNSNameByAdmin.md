@@ -10,6 +10,7 @@ Gets the list of NNS names by admin
 | Admin     | string| The Admin hash | Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
