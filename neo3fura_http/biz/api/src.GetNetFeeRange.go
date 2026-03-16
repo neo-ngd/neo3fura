@@ -26,7 +26,7 @@ func (me *T) GetNetFeeRange(args struct {
 	if err != nil {
 		return err
 	}
-	r2, _, err := me.Client.QueryAll(struct {
+	r2, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -34,6 +34,7 @@ func (me *T) GetNetFeeRange(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Transaction",
 		Index:      "GetNetFeeRange",
@@ -42,6 +43,7 @@ func (me *T) GetNetFeeRange(args struct {
 		Query:      []string{},
 		Limit:      500,
 		Skip:       0,
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err

@@ -12,6 +12,7 @@ func (me *T) GetTransferByBlockHash(args struct {
 	BlockHash h256.T
 	Limit     int64
 	Skip      int64
+	Cursor    string
 	Filter    map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.BlockHash.Valid() == false {
@@ -37,39 +38,43 @@ func (me *T) GetTransferByBlockHash(args struct {
 	if err != nil {
 		return err
 	}
-	r2, _, err2 := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r2, _, err2 := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Nep11TransferNotification",
-		Index:      "GetTransferByBlockHash",
-		Sort:       bson.M{},
-		Filter:     bson.M{"timestamp": r1["timestamp"]},
-		Query:      []string{},
+		Collection:   "Nep11TransferNotification",
+		Index:        "GetTransferByBlockHash",
+		Sort:         bson.M{},
+		Filter:       bson.M{"timestamp": r1["timestamp"]},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err2 != nil {
 		return err2
 	}
 
-	r3, _, err3 := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r3, _, err3 := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "TransferNotification",
-		Index:      "GetTransferByBlockHash",
-		Sort:       bson.M{},
-		Filter:     bson.M{"timestamp": r1["timestamp"]},
-		Query:      []string{},
+		Collection:   "TransferNotification",
+		Index:        "GetTransferByBlockHash",
+		Sort:         bson.M{},
+		Filter:       bson.M{"timestamp": r1["timestamp"]},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 
 	if err3 != nil {
@@ -86,7 +91,10 @@ func (me *T) GetTransferByBlockHash(args struct {
 			r5 = append(r5, item)
 		}
 	}
-	r6, err := me.FilterArrayAndAppendCount(r5, int64(len(r4)), args.Filter)
+
+	sortKeys := []string{"_id"}
+
+	r6, err := me.FilterArrayAndAppendCountWithCursor(r5, int64(len(r4)), args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

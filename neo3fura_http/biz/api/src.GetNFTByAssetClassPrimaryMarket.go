@@ -23,6 +23,7 @@ func (me *T) GetNFTByAssetClassPrimaryMarket(args struct {
 	ClassName     string
 	Limit         int64
 	Skip          int64
+	Cursor        string
 	Filter        map[string]interface{}
 	Raw           *map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -74,7 +75,7 @@ func (me *T) GetNFTByAssetClassPrimaryMarket(args struct {
 							"else": "$name"}}}}}}}},
 				bson.M{"$match": bson.M{"class": args.ClassName}},
 				bson.M{"$skip": args.Skip},
-				bson.M{"$limit": args.Limit},
+				bson.M{"$limit": args.Limit}, // cursor not applied here due to no stable sort
 			},
 			Query: []string{},
 		}, ret)
@@ -243,7 +244,7 @@ func (me *T) GetNFTByAssetClassPrimaryMarket(args struct {
 		return err
 	}
 	count := len(r2)
-	r3, err := me.FilterAggragateAndAppendCount(r1, count, args.Filter)
+	r3, err := me.FilterAggragateAndAppendCountWithCursor(r1, count, args.Filter, []string{"_id"})
 
 	if err != nil {
 		return err

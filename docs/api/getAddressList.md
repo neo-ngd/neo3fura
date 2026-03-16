@@ -8,6 +8,7 @@ Gets the list of addresses
 | ---------- | --- |    ------    |------|
 | Limit      | int|  The number of items to return| Optional|
 | Skip      | int|  The number of items to return| Optional|
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
@@ -20,6 +21,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetAddressList",
   "params": {"Limit":2,"Skip":2},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetAddressList",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -43,7 +57,8 @@ Response body
                 "firstusetime": 1634018852638
             }
         ],
-            "totalCount": 721
+            "totalCount": 721,
+        "nextCursor": "eyJmIjp7...}}"
     },
     "error": null
 }

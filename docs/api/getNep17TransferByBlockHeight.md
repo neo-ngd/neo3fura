@@ -9,6 +9,7 @@ Gets the Nep17 transfer information by the block height
 | BlockHeight    | int|  The blockHeight| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -23,6 +24,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
     "method":"GetNep17TransferByBlockHeight",
     "params":{"BlockHeight":69981},
     "id":1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetNep17TransferByBlockHeight",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
+  "id": 1
 }'
 ```
 
@@ -70,7 +84,8 @@ Response body
         "value": "50000000"
       }
     ],
-    "totalCount": 3
+    "totalCount": 3,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

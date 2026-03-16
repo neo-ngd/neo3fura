@@ -9,6 +9,7 @@ Gets the Nep11 transfer information by the transaction hash
 | TransactionHash     | string| The transaction hash | Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -23,6 +24,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "method": "GetNep11TransferByTransactionHash",
   "params": {"TransactionHash": "0xa15ed65858d1e73a45c5f0f9d29462fe00e1d608a8f471a293eeda80ac28294b",
   "Limit":3 },
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetNep11TransferByTransactionHash",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -50,7 +64,8 @@ Response body
         "value": "1"
       }
     ],
-    "totalCount": 1
+    "totalCount": 1,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

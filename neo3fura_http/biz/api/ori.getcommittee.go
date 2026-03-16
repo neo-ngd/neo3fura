@@ -10,6 +10,7 @@ func (me *T) Getcommittee(args []interface{}, ret *json.RawMessage) error {
 		Filter map[string]interface{}
 		Limit  int64
 		Skip   int64
+		Cursor string
 		Raw    *[]map[string]interface{}
 	}{Raw: &raw}, ret)
 	if err != nil {

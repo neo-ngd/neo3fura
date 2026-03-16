@@ -10,7 +10,7 @@ import (
 func (me *T) GetTotalVotes(args struct {
 	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
-	r1, _, err := me.Client.QueryAll(struct {
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -18,12 +18,14 @@ func (me *T) GetTotalVotes(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Candidate",
 		Index:      "GetTotalVotes",
 		Sort:       bson.M{},
 		Filter:     bson.M{},
 		Query:      []string{"votesOfCandidate"},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err

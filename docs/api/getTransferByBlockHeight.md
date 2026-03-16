@@ -9,6 +9,7 @@ Gets the transfer information by the block height
 | BlockHeight    | int|  The block height| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -22,6 +23,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetTransferByBlockHeight",
   "params": {"BlockHeight":53429,"Limit":2,"Skip":2},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetTransferByBlockHeight",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -58,7 +72,8 @@ Response body
         "value": "12345678"
       }
     ],
-    "totalCount": 2424
+    "totalCount": 2424,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

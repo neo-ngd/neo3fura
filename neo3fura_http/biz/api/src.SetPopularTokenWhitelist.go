@@ -18,7 +18,7 @@ func (me *T) SetPopularTokenWhitelist(args struct {
 		}
 		hashArr = append(hashArr, item)
 	}
-	r1, _, err := me.Client.QueryAll(struct {
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -26,12 +26,14 @@ func (me *T) SetPopularTokenWhitelist(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Asset",
 		Index:      "SetPopularTokens",
 		Sort:       bson.M{},
 		Filter:     bson.M{"hash": bson.M{"$in": hashArr}},
 		Query:      []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err

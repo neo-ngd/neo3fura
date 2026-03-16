@@ -16,6 +16,7 @@ func (me *T) GetVoteRecordByProjectId(args struct {
 	ProjectId    string
 	Limit        int64
 	Skip         int64
+		Cursor      string
 	Filter       map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.Limit == 0 {
@@ -24,7 +25,19 @@ func (me *T) GetVoteRecordByProjectId(args struct {
 	if args.ContractHash.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-	r1, count, err := me.Client.QueryAll(struct {
+	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		cursorValues, err := DecodeCursor(args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+	}
+
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -32,6 +45,7 @@ func (me *T) GetVoteRecordByProjectId(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Notification",
 		Index:      "GetVoteRecordByProjectId",
@@ -40,6 +54,7 @@ func (me *T) GetVoteRecordByProjectId(args struct {
 		Query:      []string{},
 		Limit:      args.Limit,
 		Skip:       args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err != nil {
 		return err
@@ -65,22 +80,24 @@ func (me *T) GetVoteRecordByProjectId(args struct {
 		it["votes"] = votes
 		it["timestamp"] = item["timestamp"]
 
-		r2, _, err := me.Client.QueryAll(struct {
-			Collection string
-			Index      string
-			Sort       bson.M
-			Filter     bson.M
-			Query      []string
-			Limit      int64
-			Skip       int64
+		r2, _, err := me.Client.QueryAllWithCursor(struct {
+			Collection   string
+			Index        string
+			Sort         bson.M
+			Filter       bson.M
+			Query        []string
+			Limit        int64
+			Skip         int64
+			CursorFilter bson.M
 		}{
-			Collection: "Notification",
-			Index:      "GetVoteRecordByProjectId",
-			Sort:       bson.M{},
-			Filter:     bson.M{"contract": args.ContractHash.Val(), "eventname": "OnTransfer", "txid": item["txid"]},
-			Query:      []string{},
-			Limit:      args.Limit,
-			Skip:       args.Skip,
+			Collection:   "Notification",
+			Index:        "GetVoteRecordByProjectId",
+			Sort:         bson.M{},
+			Filter:       bson.M{"contract": args.ContractHash.Val(), "eventname": "OnTransfer", "txid": item["txid"]},
+			Query:        []string{},
+			Limit:        args.Limit,
+			Skip:         args.Skip,
+			CursorFilter: nil,
 		}, ret)
 		if err != nil {
 			return err
@@ -100,7 +117,7 @@ func (me *T) GetVoteRecordByProjectId(args struct {
 
 	}
 
-	r2, err := me.FilterArrayAndAppendCount(result, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(result, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

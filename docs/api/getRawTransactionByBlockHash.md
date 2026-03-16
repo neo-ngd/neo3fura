@@ -7,6 +7,9 @@ Gets the transaction by the blockhash.
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
 | BlockHash      | string|  The blockHash of the block| Required |
+| Limit    | int|  The number of items to return| Optional|
+| Skip    | int|  The number of items to skip| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -20,6 +23,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetRawTransactionByBlockHash",
   "params": {"BlockHash":"0xe19cdbf573086552cf4e9a1dd0cc3402bef246acbf2810822fa4a03d1ca05edc"},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetRawTransactionByBlockHash",
+  "params": {"BlockHash":"0xe19cdbf573086552cf4e9a1dd0cc3402bef246acbf2810822fa4a03d1ca05edc","Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -60,7 +76,8 @@ Response body
         ]
       }
     ],
-    "totalCount": 1
+    "totalCount": 1,
+    "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

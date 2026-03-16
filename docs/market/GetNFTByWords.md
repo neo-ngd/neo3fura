@@ -11,6 +11,7 @@ Fuzzy search by name of NFT
 | Words | string | The search item | Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
@@ -66,7 +67,8 @@ Response body
       },
       ......
     ],
-    "totalCount": 1485
+    "totalCount": 1485,
+    "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

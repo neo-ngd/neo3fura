@@ -12,12 +12,25 @@ func (me *T) GetScVoteCallByVoterAddress(args struct {
 	VoterAddress h160.T
 	Limit        int64
 	Skip         int64
+		Cursor      string
 	Filter       map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.VoterAddress.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-	r1, count, err := me.Client.QueryAll(struct {
+	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		cursorValues, err := DecodeCursor(args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+	}
+
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -25,6 +38,7 @@ func (me *T) GetScVoteCallByVoterAddress(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "ScVoteCall",
 		Index:      "GetScVoteCallByVoterAddress",
@@ -33,11 +47,12 @@ func (me *T) GetScVoteCallByVoterAddress(args struct {
 		Query:      []string{},
 		Limit:      args.Limit,
 		Skip:       args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

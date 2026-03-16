@@ -27,6 +27,7 @@ func (me *T) GetNFTMarket(args struct {
 	Order           int64    //-1:降序  +1：升序
 	Limit           int64
 	Skip            int64
+	Cursor          string
 	Filter          map[string]interface{}
 	Raw             *map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -546,7 +547,7 @@ func (me *T) GetNFTMarket(args struct {
 		return err
 	}
 
-	r3, err := me.FilterAggragateAndAppendCount(r1, count, args.Filter)
+	r3, err := me.FilterAggragateAndAppendCountWithCursor(r1, count, args.Filter, []string{"_id"})
 
 	if err != nil {
 		return err

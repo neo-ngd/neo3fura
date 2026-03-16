@@ -15,6 +15,7 @@ func (me *T) GetNep17TransferByAddress(args struct {
 	Skip                int64
 	Start               int64
 	End                 int64
+	Cursor              string
 	Filter              map[string]interface{}
 	ExcludeBonusAndBurn bool
 	Raw                 *[]map[string]interface{}
@@ -92,9 +93,31 @@ func (me *T) GetNep17TransferByAddress(args struct {
 		}
 	}
 
+	sortKeys := []string{"timestamp", "_id"}
+	sortDirs := map[string]int{"timestamp": -1, "_id": -1}
+
 	pipeline := []bson.M{
 		bson.M{"$match": filter},
 		bson.M{"$sort": bson.M{"timestamp": -1, "_id": -1}},
+	}
+
+	if args.Cursor != "" {
+		cursorMatch, err := BuildCursorMatchStage(sortKeys, sortDirs, args.Cursor)
+		if err != nil {
+			return err
+		}
+		if cursorMatch != nil {
+			pipeline = append(pipeline, cursorMatch)
+		}
+	} else {
+		pipeline = append(pipeline, bson.M{"$skip": args.Skip})
+	}
+
+	if args.Limit != 0 {
+		pipeline = append(pipeline, bson.M{"$limit": args.Limit})
+	}
+
+	pipeline = append(pipeline,
 		bson.M{"$lookup": bson.M{
 			"from": "Execution",
 			"let":  bson.M{"txid": "$txid", "blockhash": "$blockhash"},
@@ -121,14 +144,7 @@ func (me *T) GetNep17TransferByAddress(args struct {
 			},
 			"as": "transaction"},
 		},
-
-		bson.M{"$skip": args.Skip},
-		//bson.M{"$limit": args.Limit},
-	}
-
-	if args.Limit != 0 {
-		pipeline = append(pipeline, bson.M{"$limit": args.Limit})
-	}
+	)
 
 	r1, err := me.Client.QueryAggregate(struct {
 		Collection string
@@ -187,7 +203,7 @@ func (me *T) GetNep17TransferByAddress(args struct {
 		*args.Raw = r1
 	}
 
-	r2, err := me.FilterArrayAndAppendCount(r1, count["total counts"].(int64), args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count["total counts"].(int64), args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

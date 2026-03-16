@@ -15,6 +15,7 @@ Gets the NFT token list by the contract hash, asset and NFT state.
 | Order     | int|  Descending sort: -1; Ascending sort: +1| Optional |
 | Limit | intint | The number of items to return | Optional |
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 ### Example
 
 Request body
@@ -106,7 +107,8 @@ Response body
         "tokenid": "TWV0YVBhbmFjZWEgIzgtMDE="
       }
     ],
-    "totalCount": 3984
+    "totalCount": 3984,
+    "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

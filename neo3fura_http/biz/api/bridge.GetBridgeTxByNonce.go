@@ -43,7 +43,7 @@ func (me *T) GetBridgeTxByNonce(args struct {
 		}
 	}
 
-	r1, _, err := me.Client.QueryAll(struct {
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -51,6 +51,7 @@ func (me *T) GetBridgeTxByNonce(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Notification",
 		Index:      "GetBridgeTxByNonce",
@@ -59,6 +60,7 @@ func (me *T) GetBridgeTxByNonce(args struct {
 		Query:      []string{},
 		Limit:      args.Limit,
 		Skip:       args.Skip,
+		CursorFilter: nil,
 	}, ret)
 
 	var result map[string]interface{}

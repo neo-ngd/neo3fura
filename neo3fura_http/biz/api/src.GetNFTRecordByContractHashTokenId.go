@@ -29,20 +29,22 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 	}
 	result := make([]map[string]interface{}, 0)
 
-	r1, _, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "MarketNotification",
-		Index:      "GetNFTRecordByContractHashTokenId",
-		Sort:       bson.M{"timestamp": -1},
-		Filter:     f,
-		Query:      []string{},
+		Collection:   "MarketNotification",
+		Index:        "GetNFTRecordByContractHashTokenId",
+		Sort:         bson.M{"timestamp": -1},
+		Filter:       f,
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
@@ -54,6 +56,7 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 		ContractHash h160.T
 		Limit        int64
 		Skip         int64
+		Cursor       string
 		TokenId      strval.T
 		Filter       map[string]interface{}
 		Raw          *[]map[string]interface{}
@@ -178,7 +181,7 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(result, num, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(result, num, args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

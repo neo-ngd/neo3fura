@@ -21,6 +21,7 @@ func (me *T) GetNFTByWords(args struct {
 	Words           strval.T
 	Limit           int64
 	Skip            int64
+	Cursor          string
 	Filter          map[string]interface{}
 	Raw             *map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -322,7 +323,8 @@ func (me *T) GetNFTByWords(args struct {
 	}
 	count := len(r2)
 
-	r3, err := me.FilterAggragateAndAppendCount(r1, count, args.Filter)
+	sortKeys := []string{"_id"}
+	r3, err := me.FilterAggragateAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 
 	if err != nil {
 		return err

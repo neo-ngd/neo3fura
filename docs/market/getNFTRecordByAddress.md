@@ -15,6 +15,7 @@ get nft record by user's address
 | SecondaryMarket | string | the second marketplace hash   | optional |
 | Skip            | int    | the number of items to return | optional |
 | Limit           | int    | the number of items to return | optional |
+| Cursor          | string | Cursor for keyset pagination (from previous response's nextCursor) | optional |
 
 
 #### Example
@@ -55,7 +56,8 @@ curl --location --request GET 'https://testneofura.ngd.network:444' \
       },
       .....
     ],
-    "totalCount": 7
+    "totalCount": 7,
+    "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

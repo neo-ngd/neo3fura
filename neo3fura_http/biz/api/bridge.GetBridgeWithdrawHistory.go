@@ -26,6 +26,7 @@ func (me *T) GetBridgeDepositHistory(args struct {
 	Sender       h160.T
 	Limit        int64
 	Skip         int64
+	Cursor       string
 	Filter       map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.ContractHash.Valid() == false {
@@ -46,22 +47,36 @@ func (me *T) GetBridgeDepositHistory(args struct {
 		}
 	}
 
-	r1, count, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	sortKeys := []string{"timestamp"}
+	sortDirs := map[string]int{"timestamp": -1}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		cursorValues, err := DecodeCursor(args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+	}
+
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Notification",
-		Index:      "GetBridgeDepositHistory",
-		Sort:       bson.M{"timestamp": -1},
-		Filter:     filter,
-		Query:      []string{},
-		Limit:      args.Limit,
-		Skip:       args.Skip,
+		Collection:   "Notification",
+		Index:        "GetBridgeDepositHistory",
+		Sort:         bson.M{"timestamp": -1},
+		Filter:       filter,
+		Query:        []string{},
+		Limit:        args.Limit,
+		Skip:         args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 
 	//get status of target chain
@@ -151,20 +166,22 @@ func (me *T) GetBridgeDepositHistory(args struct {
 				return fmt.Errorf("fail to Uint160DecodeBytesLE for fromAddress: %w", err)
 			}
 
-			r2, _, err := me.Client.QueryAll(struct {
-				Collection string
-				Index      string
-				Sort       bson.M
-				Filter     bson.M
-				Query      []string
-				Limit      int64
-				Skip       int64
+			r2, _, err := me.Client.QueryAllWithCursor(struct {
+				Collection   string
+				Index        string
+				Sort         bson.M
+				Filter       bson.M
+				Query        []string
+				Limit        int64
+				Skip         int64
+				CursorFilter bson.M
 			}{
-				Collection: "Asset",
-				Index:      "Asset",
-				Sort:       bson.M{"_id": -1},
-				Filter:     bson.M{"hash": "0x" + n3TokenDecode.String()},
-				Query:      []string{},
+				Collection:   "Asset",
+				Index:        "Asset",
+				Sort:         bson.M{"_id": -1},
+				Filter:       bson.M{"hash": "0x" + n3TokenDecode.String()},
+				Query:        []string{},
+				CursorFilter: nil,
 			}, ret)
 
 			if err != nil {
@@ -198,7 +215,7 @@ func (me *T) GetBridgeDepositHistory(args struct {
 
 	}
 
-	r2, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}
@@ -289,20 +306,22 @@ func BigIntToDecimalData(amount *big.Int, decimal int64) string {
 }
 
 func (me *T) getTokenInfo(token string, ret *json.RawMessage) (string, int64, error) {
-	r1, _, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Asset",
-		Index:      "Asset",
-		Sort:       bson.M{"_id": -1},
-		Filter:     bson.M{"hash": token},
-		Query:      []string{},
+		Collection:   "Asset",
+		Index:        "Asset",
+		Sort:         bson.M{"_id": -1},
+		Filter:       bson.M{"hash": token},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 
 	if err != nil {

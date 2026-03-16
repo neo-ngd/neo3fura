@@ -9,6 +9,7 @@ Gets the extra transfer(transfer with the txid of 0) by the block hash
 | BlockHash     | string| The block hash of the transaction | Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -22,6 +23,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetExtraTransferByBlockHash",
   "params": {"Limit":1,"blockhash":"0xf6ba8db5c013834890903a30a4ce0d65ec5da2addaf4799f15efbedaff42c56f"},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetExtraTransferByBlockHash",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -46,7 +60,8 @@ Response body
                 "value": "50000000"
             }
         ],
-            "totalCount": 1
+            "totalCount": 1,
+        "nextCursor": "eyJmIjp7...}}"
     },
     "error": null
 }

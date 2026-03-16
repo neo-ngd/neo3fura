@@ -25,6 +25,7 @@ func (me *T) GetNFTOwnedByAddress(args struct {
 	Order        int64    //-1:降序  +1：升序
 	Limit        int64
 	Skip         int64
+	Cursor       string
 	Filter       map[string]interface{}
 	Raw          *map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -328,10 +329,12 @@ func (me *T) GetNFTOwnedByAddress(args struct {
 		}
 	}
 
-	//skip := bson.M{"$skip": args.Skip}
-	//limit := bson.M{"$limit": args.Limit}
-	//pipeline = append(pipeline, skip)
-	//pipeline = append(pipeline, limit)
+	skip := bson.M{"$skip": args.Skip}
+	pipeline = append(pipeline, skip)
+	if args.Limit > 0 {
+		limit := bson.M{"$limit": args.Limit}
+		pipeline = append(pipeline, limit)
+	}
 
 	var r1, err = me.Client.QueryAggregate(
 		struct {

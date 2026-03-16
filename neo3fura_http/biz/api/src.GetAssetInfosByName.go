@@ -20,7 +20,7 @@ func (me *T) GetAssetInfosByName(args struct {
 	if args.Limit == 0 {
 		args.Limit = 512
 	}
-	r1, _, err := me.Client.QueryAll(struct {
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -28,12 +28,14 @@ func (me *T) GetAssetInfosByName(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "Asset",
 		Index:      "GetAssetInfos",
 		Sort:       bson.M{},
 		Filter:     bson.M{"$or": []interface{}{bson.M{"tokenname": bson.M{"$regex": args.Name, "$options": "$i"}}, bson.M{"symbol": bson.M{"$regex": args.Name, "$options": "$i"}}}},
 		Query:      []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err
@@ -126,7 +128,7 @@ func (me *T) GetAssetInfosByName(args struct {
 			r6 = append(r6, item)
 		}
 	}
-	r4, err := me.FilterArrayAndAppendCount(r6, int64(len(r5)), args.Filter)
+	r4, err := me.FilterArrayAndAppendCountWithCursor(r6, int64(len(r5)), args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

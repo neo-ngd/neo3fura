@@ -7,6 +7,10 @@ Gets the nep11 transfer information by the contract script hash and tokenid
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
 | ContractHash     | string| The contract script hash | Required |
+| TokenId     | string| The token id | Required |
+| Limit    | int|  The number of items to return| Optional|
+| Skip    | int|  The number of items to skip| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -20,6 +24,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetNep11TransferByContractHashTokenId",
   "params": {"ContractHash":"0xb137c83610d3f0331a48d8d6283864120b4f23a1","tokenId":"1wA="},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetNep11TransferByContractHashTokenId",
+  "params": {"ContractHash":"0xb137c83610d3f0331a48d8d6283864120b4f23a1","tokenId":"1wA=","Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -45,7 +62,8 @@ Response body
         "value": "1"
       }
     ],
-    "totalCount": 1
+    "totalCount": 1,
+    "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

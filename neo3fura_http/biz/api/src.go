@@ -75,6 +75,18 @@ func (me *T) FilterArrayAndAppendCount(data []map[string]interface{}, count int6
 		return res2, nil
 	}
 }
+
+func (me *T) FilterArrayAndAppendCountWithCursor(data []map[string]interface{}, count int64, filter map[string]interface{}, sortKeys []string) (map[string]interface{}, error) {
+	res2, err := me.FilterArrayAndAppendCount(data, count, filter)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > 0 {
+		res2["nextCursor"] = EncodeCursor(data[len(data)-1], sortKeys)
+	}
+	return res2, nil
+}
+
 func (me *T) FilterAggragateAndAppendCount(data []map[string]interface{}, count interface{}, filter map[string]interface{}) (map[string]interface{}, error) {
 	if filter == nil {
 		res2 := make(map[string]interface{})
@@ -95,4 +107,15 @@ func (me *T) FilterAggragateAndAppendCount(data []map[string]interface{}, count 
 		res2["result"] = res
 		return res2, nil
 	}
+}
+
+func (me *T) FilterAggragateAndAppendCountWithCursor(data []map[string]interface{}, count interface{}, filter map[string]interface{}, sortKeys []string) (map[string]interface{}, error) {
+	res2, err := me.FilterAggragateAndAppendCount(data, count, filter)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > 0 {
+		res2["nextCursor"] = EncodeCursor(data[len(data)-1], sortKeys)
+	}
+	return res2, nil
 }

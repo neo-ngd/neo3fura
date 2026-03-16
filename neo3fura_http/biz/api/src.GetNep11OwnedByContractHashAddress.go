@@ -13,6 +13,7 @@ func (me *T) GetNep11OwnedByContractHashAddress(args struct {
 	Address      h160.T
 	Limit        int64
 	Skip         int64
+	Cursor       string
 	Filter       map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.Address.Valid() == false && args.ContractHash.Valid() == false {
@@ -28,28 +29,42 @@ func (me *T) GetNep11OwnedByContractHashAddress(args struct {
 		filter = bson.M{"tokenid": bson.M{"$ne": ""}, "balance": bson.M{"$gt": 0}, "asset": args.ContractHash.Val()}
 	}
 
-	r1, count, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		cursorValues, err := DecodeCursor(args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+	}
+
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Address-Asset",
-		Index:      "GetNep11OwnedByContractHashAddress",
-		Sort:       bson.M{},
-		Filter:     filter,
-		Query:      []string{},
-		Limit:      args.Limit,
-		Skip:       args.Skip,
+		Collection:   "Address-Asset",
+		Index:        "GetNep11OwnedByContractHashAddress",
+		Sort:         bson.M{},
+		Filter:       filter,
+		Query:        []string{},
+		Limit:        args.Limit,
+		Skip:         args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err != nil {
 		return err
 	}
 	//r2, err := me.Deduplicate(r1)
-	r3, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
+	r3, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

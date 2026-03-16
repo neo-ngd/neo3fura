@@ -12,6 +12,7 @@ func (me *T) GetTransferByAddress(args struct {
 	Address h160.T
 	Limit   int64
 	Skip    int64
+	Cursor  string
 	Filter  map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.Address.Valid() == false {
@@ -20,14 +21,15 @@ func (me *T) GetTransferByAddress(args struct {
 	if args.Limit == 0 {
 		args.Limit = 512
 	}
-	r1, _, err1 := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r1, _, err1 := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
 		Collection: "Nep11TransferNotification",
 		Index:      "GetNep11TransferByAddress",
@@ -36,20 +38,22 @@ func (me *T) GetTransferByAddress(args struct {
 			bson.M{"from": args.Address.TransferredVal()},
 			bson.M{"to": args.Address.TransferredVal()},
 		}},
-		Query: []string{},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err1 != nil {
 		return err1
 	}
 
-	r2, _, err2 := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r2, _, err2 := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
 		Collection: "TransferNotification",
 		Index:      "GetNep17TransferByAddress",
@@ -58,7 +62,8 @@ func (me *T) GetTransferByAddress(args struct {
 			bson.M{"from": args.Address.TransferredVal()},
 			bson.M{"to": args.Address.TransferredVal()},
 		}},
-		Query: []string{},
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 
 	if err2 != nil {
@@ -75,7 +80,10 @@ func (me *T) GetTransferByAddress(args struct {
 			r4 = append(r4, item)
 		}
 	}
-	r5, err := me.FilterArrayAndAppendCount(r4, int64(len(r3)), args.Filter)
+
+	sortKeys := []string{"_id"}
+
+	r5, err := me.FilterArrayAndAppendCountWithCursor(r4, int64(len(r3)), args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}
