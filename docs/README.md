@@ -13,6 +13,7 @@ Anything about Neo! You can not only use Neo RPC ([https://docs.neo.org/docs/zh-
 Feeling like an eager beaver? Jump in to the quick start docs and get making your first request:
 
 - [Quick Start](/guide/quick-start)
+- [Pagination Policy (Cursor First)](/guide/pagination-policy)
 
 ### Want to deep dive?
 

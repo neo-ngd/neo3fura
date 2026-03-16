@@ -9,7 +9,7 @@ Gets the raw transaction by address
 | Address     | string|  The user's address| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
-| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
+| Cursor  | string| Cursor-based pagination token. When provided, `Skip` is ignored.| Optional |
 
 ### Example
 
@@ -32,12 +32,13 @@ Request body (with cursor)
 ```powershell
 curl --location --request POST 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \
---data-raw '{
+--data-raw '{  
   "jsonrpc": "2.0",
   "method": "GetRawTransactionByAddress",
-  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
+  "params": {"Address":"NfnYGUoC6TKhevumjTUFyYnfQtZRjMaXch","Limit":50,"Cursor":"<nextCursor from previous page>"},
   "id": 1
-}'
+}
+'
 ```
 
 Response body

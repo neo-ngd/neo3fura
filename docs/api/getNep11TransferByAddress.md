@@ -9,7 +9,7 @@ Gets the Nep11 transfer information by the user's address (0x0 transaction not i
 | Address    | string|  The user's address| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
-| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
+| Cursor  | string| Cursor-based pagination token. When provided, `Skip` is ignored.| Optional |
 
 
 ### Example
@@ -35,7 +35,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 --data-raw '{
   "jsonrpc": "2.0",
   "method": "GetNep11TransferByAddress",
-  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
+  "params": {"Address":"0x2e9a0e6a68a4acce23ca14408bb4d0b803425394","Limit":50,"Cursor":"<nextCursor from previous page>"},
   "id": 1
 }'
 ```
