@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	"sort"
+	"strconv"
 	"strings"
-
+	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/joeqian10/neo3-gogogo/rpc"
@@ -285,7 +287,7 @@ func (me *T) QueryAll(args struct {
 		return nil, 0, stderr.ErrFind
 	}
 
-	cursor, err := collection.Find(me.Ctx, args.Filter, op)
+	cursor, err := collection.Find(queryCtx, args.Filter, op)
 	if err == mongo.ErrNoDocuments {
 
 		return nil, 0, stderr.ErrNotFound
@@ -295,11 +297,11 @@ func (me *T) QueryAll(args struct {
 	}
 	defer func() {
 
-		if err := cursor.Close(me.Ctx); err != nil {
+		if err := cursor.Close(queryCtx); err != nil {
 			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(me.Ctx, &results); err != nil {
+	if err = cursor.All(queryCtx, &results); err != nil {
 
 		return nil, 0, stderr.ErrFind
 	}
@@ -521,7 +523,7 @@ func (me *T) QueryLastJobs(args struct {
 	op.SetSort(args.Sort)
 	op.SetLimit(args.Limit)
 	op.SetSkip(args.Skip)
-	cursor, err := collection.Find(me.Ctx, args.Filter, op)
+	cursor, err := collection.Find(queryCtx, args.Filter, op)
 	if err == mongo.ErrNoDocuments {
 		return nil, stderr.ErrNotFound
 	}
@@ -529,11 +531,11 @@ func (me *T) QueryLastJobs(args struct {
 		return nil, stderr.ErrFind
 	}
 	defer func() {
-		if err := cursor.Close(me.Ctx); err != nil {
+		if err := cursor.Close(queryCtx); err != nil {
 			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(me.Ctx, &results); err != nil {
+	if err = cursor.All(queryCtx, &results); err != nil {
 		return nil, stderr.ErrFind
 	}
 	return results, nil
@@ -557,7 +559,7 @@ func (me *T) QueryAggregate(args struct {
 	op := options.AggregateOptions{}
 	op.SetAllowDiskUse(true)
 
-	cursor, err := collection.Aggregate(me.Ctx, args.Pipeline, &op)
+	cursor, err := collection.Aggregate(queryCtx, args.Pipeline, &op)
 	if err == mongo.ErrNoDocuments {
 		return nil, stderr.ErrNotFound
 	}
@@ -565,11 +567,11 @@ func (me *T) QueryAggregate(args struct {
 		return nil, stderr.ErrFind
 	}
 	defer func() {
-		if err := cursor.Close(me.Ctx); err != nil {
+		if err := cursor.Close(queryCtx); err != nil {
 			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(me.Ctx, &results); err != nil {
+	if err = cursor.All(queryCtx, &results); err != nil {
 		return nil, stderr.ErrFind
 	}
 
@@ -610,7 +612,7 @@ func (me *T) QueryAggregateJob(args struct {
 	defer cancel()
 	op := options.AggregateOptions{}
 
-	cursor, err := collection.Aggregate(me.Ctx, args.Pipeline, &op)
+	cursor, err := collection.Aggregate(queryCtx, args.Pipeline, &op)
 	if err == mongo.ErrNoDocuments {
 		return nil, stderr.ErrNotFound
 	}
@@ -618,11 +620,11 @@ func (me *T) QueryAggregateJob(args struct {
 		return nil, stderr.ErrFind
 	}
 	defer func() {
-		if err := cursor.Close(me.Ctx); err != nil {
+		if err := cursor.Close(queryCtx); err != nil {
 			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(me.Ctx, &results); err != nil {
+	if err = cursor.All(queryCtx, &results); err != nil {
 		return nil, stderr.ErrFind
 	}
 
