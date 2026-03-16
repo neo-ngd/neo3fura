@@ -9,6 +9,7 @@ Gets the notification by the contract script hash
 | ContractHash     | string| The contract script hash | Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor    | string| Cursor from previous page; used when Skip is not provided (or 0) | Optional |
 
 
 ### Example
@@ -21,7 +22,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 --data-raw '{  
   "jsonrpc": "2.0",
   "method": "GetNotificationByContractHash",
-  "params": {"ContractHash":"0xd2a4cff31913016155e38e474a2c06d08be276cf","Limit":2},
+  "params": {"ContractHash":"0xd2a4cff31913016155e38e474a2c06d08be276cf","Limit":2,"Cursor":""},
   "id": 1
 }'
 ```

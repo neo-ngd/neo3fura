@@ -7,6 +7,10 @@ Gets the nep11 transfer information by the contract script hash and tokenid
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
 | ContractHash     | string| The contract script hash | Required |
+| TokenId     | string| NFT token id | Optional |
+| Limit    | int| The number of items to return | Optional |
+| Skip    | int| The number of items to skip | Optional |
+| Cursor    | string| Cursor from previous page; used when Skip is not provided (or 0) | Optional |
 
 
 ### Example
@@ -19,7 +23,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 --data-raw '{
   "jsonrpc": "2.0",
   "method": "GetNep11TransferByContractHashTokenId",
-  "params": {"ContractHash":"0xb137c83610d3f0331a48d8d6283864120b4f23a1","tokenId":"1wA="},
+  "params": {"ContractHash":"0xb137c83610d3f0331a48d8d6283864120b4f23a1","tokenId":"1wA=","Limit":10,"Cursor":""},
   "id": 1
 }'
 ```

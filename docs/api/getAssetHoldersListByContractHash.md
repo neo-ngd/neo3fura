@@ -9,6 +9,7 @@ Gets all NEP11 assets and related holders with the contract script hash.
 | ContractHash     | string| The contract script hash | Required|
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int| The number of items to return | Optional |
+| Cursor    | string| Cursor from previous page; used when Skip is not provided (or 0) | Optional |
 | Balance    | int| Equals to 1 | Required|
 
 ### Example
@@ -21,7 +22,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 --data-raw '{
   "jsonrpc": "2.0",
   "method": "GetAssetHoldersListByContractHash",
-  "params": {"ContractHash":"0xd9e2093de3dc2ef7cf5704ceec46ab7fadd48e7f","Limit":10,"balance":1},
+  "params": {"ContractHash":"0xd9e2093de3dc2ef7cf5704ceec46ab7fadd48e7f","Limit":10,"Cursor":"","balance":1},
   "id": 1
 }'
 ```

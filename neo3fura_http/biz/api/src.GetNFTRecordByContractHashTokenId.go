@@ -56,10 +56,11 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 		ContractHash h160.T
 		Limit        int64
 		Skip         int64
+		Cursor       string
 		TokenId      strval.T
 		Filter       map[string]interface{}
 		Raw          *[]map[string]interface{}
-	}{ContractHash: args.ContractHash, TokenId: args.TokenId, Raw: &raw2}, ret)
+	}{ContractHash: args.ContractHash, Cursor: "", TokenId: args.TokenId, Raw: &raw2}, ret)
 	if err3 != nil {
 		fmt.Println("2", err)
 		return err3

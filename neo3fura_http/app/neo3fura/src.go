@@ -389,8 +389,15 @@ func buildSwaggerOpenAPIDoc() map[string]interface{} {
 	for _, method := range methods {
 		path := "/swagger/rpc/" + method
 		paramsExample, paramsRequired, paramSource := defaultParamsForMethod(method)
+		// Hide optional Filter from Swagger UI request params.
+		delete(paramsExample, "Filter")
+		delete(paramsExample, "filter")
+		paramsRequired = removeParamIgnoreCase(paramsRequired, "Filter")
 		paramsProperties := map[string]interface{}{}
 		for k, v := range paramsExample {
+			if strings.EqualFold(k, "Filter") {
+				continue
+			}
 			paramsProperties[k] = inferredSchemaForValue(v)
 		}
 		desc := "Try this RPC method directly from Swagger. Request body uses standard JSON-RPC fields."
@@ -882,6 +889,20 @@ func isLikelyRequiredSourceParam(name, typ string) bool {
 		return false
 	}
 	return true
+}
+
+func removeParamIgnoreCase(items []string, target string) []string {
+	if len(items) == 0 {
+		return items
+	}
+	out := make([]string, 0, len(items))
+	for _, it := range items {
+		if strings.EqualFold(strings.TrimSpace(it), target) {
+			continue
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 func initializeMongoOnlineClient(cfg Config, ctx context.Context) (*mongo.Client, string) {
