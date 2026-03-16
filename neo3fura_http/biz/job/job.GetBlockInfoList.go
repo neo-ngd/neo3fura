@@ -9,52 +9,48 @@ func (me T) GetBlockInfoList() error {
 	message := make(json.RawMessage, 0)
 	ret := &message
 
-	r1, _, err := me.Client.QueryAll(
+	// Use $lookup to get transaction count in a single aggregation query
+	// instead of N+1 separate count queries per block.
+	r1, err := me.Client.QueryAggregate(
 		struct {
 			Collection string
 			Index      string
 			Sort       bson.M
 			Filter     bson.M
+			Pipeline   []bson.M
 			Query      []string
-			Limit      int64
-			Skip       int64
 		}{
 			Collection: "Block",
 			Index:      "GetBlockInfoList",
-			Sort:       bson.M{"_id": -1},
+			Sort:       bson.M{},
 			Filter:     bson.M{},
-			Query:      []string{"_id", "index", "size", "timestamp", "hash"},
-			Limit:      10,
-			Skip:       0,
+			Pipeline: []bson.M{
+				bson.M{"$sort": bson.M{"_id": -1}},
+				bson.M{"$limit": int64(10)},
+				bson.M{"$lookup": bson.M{
+					"from": "Transaction",
+					"let":  bson.M{"blockhash": "$hash"},
+					"pipeline": []bson.M{
+						bson.M{"$match": bson.M{"$expr": bson.M{"$eq": []interface{}{"$blockhash", "$$blockhash"}}}},
+					},
+					"as": "txs",
+				}},
+				bson.M{"$project": bson.M{
+					"_id":              1,
+					"index":            1,
+					"size":             1,
+					"timestamp":        1,
+					"hash":             1,
+					"transactioncount": bson.M{"$size": "$txs"},
+				}},
+			},
+			Query: []string{},
 		}, ret)
 	if err != nil {
 		return err
 	}
 
-	r2 := make([]map[string]interface{}, 0)
-	for _, item := range r1 {
-		r3, err := me.Client.QueryDocument(
-			struct {
-				Collection string
-				Index      string
-				Sort       bson.M
-				Filter     bson.M
-			}{Collection: "Transaction",
-				Index:  "GetBlockInfoList",
-				Sort:   bson.M{},
-				Filter: bson.M{"blockhash": item["hash"]}}, ret)
-		if err != nil {
-			return err
-		}
-		if r3["total counts"] == nil {
-			item["transactioncount"] = 0
-		} else {
-			item["transactioncount"] = r3["total counts"]
-		}
-		r2 = append(r2, item)
-	}
-
-	data := bson.M{"BlockInfoList": r2}
+	data := bson.M{"BlockInfoList": r1}
 	_, err = me.Client.SaveJob(struct {
 		Collection string
 		Data       bson.M

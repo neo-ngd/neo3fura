@@ -18,6 +18,7 @@ func (me *T) GetNFTByAssetClass(args struct {
 	ClassName string
 	Limit     int64
 	Skip      int64
+	Cursor    string
 	Filter    map[string]interface{}
 	Raw       *map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -52,6 +53,47 @@ func (me *T) GetNFTByAssetClass(args struct {
 		primaryMarket = Contract.Test_PrimaryMarket.Val()
 	}
 
+	sortKeys := []string{"tokenid"}
+	sortDirs := map[string]int{"tokenid": 1}
+
+	pipeline := []bson.M{
+		bson.M{"$match": bson.M{"asset": args.Asset}},
+		bson.M{"$set": bson.M{"class": bson.M{"$cond": bson.M{"if": bson.M{"$eq": []interface{}{"$asset", nns}}, "then": "$asset",
+			"else": bson.M{"$cond": bson.M{"if": bson.M{"$eq": []interface{}{"$asset", genesis}}, "then": "$image",
+				"else": bson.M{"$cond": bson.M{"if": bson.M{"$eq": []interface{}{"$asset", polemen}}, "then": "$tokenid",
+					"else": "$name"}}}}}}}},
+		bson.M{"$match": bson.M{"class": args.ClassName}},
+		bson.M{"$sort": bson.M{"tokenid": 1}},
+	}
+
+	if args.Cursor != "" {
+		cursorMatch, err := BuildCursorMatchStage(sortKeys, sortDirs, args.Cursor)
+		if err != nil {
+			return err
+		}
+		if cursorMatch != nil {
+			pipeline = append(pipeline, cursorMatch)
+		}
+	} else {
+		pipeline = append(pipeline, bson.M{"$skip": args.Skip})
+	}
+
+	pipeline = append(pipeline,
+		bson.M{"$limit": args.Limit},
+		bson.M{"$lookup": bson.M{
+			"from": "Market",
+			"let":  bson.M{"asset": "$asset", "tokenid": "$tokenid"},
+			"pipeline": []bson.M{
+				bson.M{"$match": bson.M{"amount": bson.M{"$gt": 0}, "market": bson.M{"$ne": primaryMarket}}},
+				bson.M{"$match": bson.M{"$expr": bson.M{"$and": []interface{}{
+					bson.M{"$eq": []interface{}{"$tokenid", "$$tokenid"}},
+					bson.M{"$eq": []interface{}{"$asset", "$$asset"}},
+				}}}},
+			},
+			"as": "market"},
+		},
+	)
+
 	r1, err := me.Client.QueryAggregate(
 		struct {
 			Collection string
@@ -65,31 +107,8 @@ func (me *T) GetNFTByAssetClass(args struct {
 			Index:      "GetAssetInfo",
 			Sort:       bson.M{},
 			Filter:     bson.M{},
-			Pipeline: []bson.M{
-				bson.M{"$match": bson.M{"asset": args.Asset}},
-				bson.M{"$set": bson.M{"class": bson.M{"$cond": bson.M{"if": bson.M{"$eq": []interface{}{"$asset", nns}}, "then": "$asset",
-					"else": bson.M{"$cond": bson.M{"if": bson.M{"$eq": []interface{}{"$asset", genesis}}, "then": "$image",
-						"else": bson.M{"$cond": bson.M{"if": bson.M{"$eq": []interface{}{"$asset", polemen}}, "then": "$tokenid",
-							"else": "$name"}}}}}}}},
-				bson.M{"$match": bson.M{"class": args.ClassName}},
-				bson.M{"$lookup": bson.M{
-					"from": "Market",
-					"let":  bson.M{"asset": "$asset", "tokenid": "$tokenid"},
-					"pipeline": []bson.M{
-						bson.M{"$match": bson.M{"amount": bson.M{"$gt": 0}, "market": bson.M{"$ne": primaryMarket}}},
-						bson.M{"$match": bson.M{"$expr": bson.M{"$and": []interface{}{
-							bson.M{"$eq": []interface{}{"$tokenid", "$$tokenid"}},
-							bson.M{"$eq": []interface{}{"$asset", "$$asset"}},
-						}}}},
-						//bson.M{"$project": bson.M{"asset": 1, "tokenid": 1, "properties": 1}},
-					},
-					"as": "market"},
-				},
-				bson.M{"$sort": bson.M{"tokenid": 1}},
-				bson.M{"$skip": args.Skip},
-				bson.M{"$limit": args.Limit},
-			},
-			Query: []string{},
+			Pipeline:   pipeline,
+			Query:      []string{},
 		}, ret)
 	if err != nil {
 		return err
@@ -258,7 +277,7 @@ func (me *T) GetNFTByAssetClass(args struct {
 		return err
 	}
 	count := len(r2)
-	r3, err := me.FilterAggragateAndAppendCount(result, count, args.Filter)
+	r3, err := me.FilterAggragateAndAppendCountWithCursor(result, count, args.Filter, sortKeys)
 
 	if err != nil {
 		return err

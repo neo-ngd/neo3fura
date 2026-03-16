@@ -28,6 +28,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 }'
 ```
 
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetScCallByContractHash",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
+  "id": 1
+}'
+```
+
 Response body
 
 ```json
@@ -66,7 +79,8 @@ Response body
         "txid": "0x615c4c7ece85ce7d6cfe6d5f6d3495b5f46b43e298b79166488dbe431f067ca7"
       }
     ],
-    "totalCount": 30451
+    "totalCount": 30451,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

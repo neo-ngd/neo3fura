@@ -13,6 +13,7 @@ func (me *T) GetAssetHoldersByContractHash(args struct {
 	ContractHash h160.T
 	Limit        int64
 	Skip         int64
+	Cursor       string
 	Filter       map[string]interface{}
 	Raw          *[]map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -40,22 +41,48 @@ func (me *T) GetAssetHoldersByContractHash(args struct {
 	}
 
 	var pipeline []bson.M
+	var sortKeys []string
+	var sortDirs map[string]int
 
 	if asset_type == "NEP11" {
+		sortKeys = []string{"count"}
+		sortDirs = map[string]int{"count": -1}
 		pipeline = []bson.M{
 			bson.M{"$match": bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}}},
 			bson.M{"$group": bson.M{"_id": "$address", "count": bson.M{"$sum": 1}, "tokenidArr": bson.M{"$push": "$$ROOT"}}},
 			bson.M{"$sort": bson.M{"count": -1}},
-			bson.M{"$skip": args.Skip},
-			bson.M{"$limit": args.Limit},
 		}
+		if args.Cursor != "" {
+			cursorMatch, cerr := BuildCursorMatchStage(sortKeys, sortDirs, args.Cursor)
+			if cerr != nil {
+				return cerr
+			}
+			if cursorMatch != nil {
+				pipeline = append(pipeline, cursorMatch)
+			}
+		} else {
+			pipeline = append(pipeline, bson.M{"$skip": args.Skip})
+		}
+		pipeline = append(pipeline, bson.M{"$limit": args.Limit})
 	} else if asset_type == "NEP17" {
+		sortKeys = []string{"balance"}
+		sortDirs = map[string]int{"balance": -1}
 		pipeline = []bson.M{
 			bson.M{"$match": bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}}},
 			bson.M{"$sort": bson.M{"balance": -1}},
-			bson.M{"$skip": args.Skip},
-			bson.M{"$limit": args.Limit},
 		}
+		if args.Cursor != "" {
+			cursorMatch, cerr := BuildCursorMatchStage(sortKeys, sortDirs, args.Cursor)
+			if cerr != nil {
+				return cerr
+			}
+			if cursorMatch != nil {
+				pipeline = append(pipeline, cursorMatch)
+			}
+		} else {
+			pipeline = append(pipeline, bson.M{"$skip": args.Skip})
+		}
+		pipeline = append(pipeline, bson.M{"$limit": args.Limit})
 	} else {
 		return stderr.ErrAssetType
 	}
@@ -130,7 +157,7 @@ func (me *T) GetAssetHoldersByContractHash(args struct {
 		return err
 	}
 
-	r3, err := me.FilterArrayAndAppendCount(r2, count["total counts"].(int64), args.Filter)
+	r3, err := me.FilterArrayAndAppendCountWithCursor(r2, count["total counts"].(int64), args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

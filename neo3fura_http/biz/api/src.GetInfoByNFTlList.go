@@ -3,8 +3,8 @@ package api
 import (
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/big"
+	log2 "neo3fura_http/lib/log"
 	"neo3fura_http/lib/type/Contract"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/strval"
@@ -22,7 +22,13 @@ func (me *T) GetInfoByNFTList(args struct {
 	}
 	Filter map[string]interface{}
 	Raw    *map[string]interface{}
-}, ret *json.RawMessage) error {
+}, ret *json.RawMessage) (errRet error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log2.Errorf("GetInfoByNFTList panic recovered: %v", r)
+			errRet = stderr.ErrData
+		}
+	}()
 
 	nftlist := make([]map[string]interface{}, 0)
 
@@ -84,9 +90,15 @@ func (me *T) GetInfoByNFTList(args struct {
 
 	for _, item := range r1 {
 		//NFT状态   上架 （售卖中  成交未领取）  未上架
-		ddl := item["deadline"].(int64)
+		ddl, ok := asInt64(item["deadline"])
+		if !ok {
+			continue
+		}
 
-		bidAmount := item["bidAmount"].(primitive.Decimal128).String()
+		bidAmount, ok := asDecimalString(item["bidAmount"])
+		if !ok {
+			bidAmount = "0"
+		}
 		if item["market"] != item["owner"] || ddl < currentTime {
 			item["state"] = "notlist"
 		} else {
@@ -107,50 +119,73 @@ func (me *T) GetInfoByNFTList(args struct {
 		item["offerAsset"] = ""
 		item["offerAmount"] = "0"
 
-		auctionType := item["auctionType"].(int32)
+		auctionType, ok := asInt32(item["auctionType"])
+		if !ok {
+			auctionType = 0
+		}
 		if ddl > currentTime {
 			if auctionType == 1 {
 				item["buyNowAsset"] = item["auctionAsset"]
-				item["buyNowAmount"] = item["auctionAmount"].(primitive.Decimal128).String()
+				if amount, ok := asDecimalString(item["auctionAmount"]); ok {
+					item["buyNowAmount"] = amount
+				}
 			} else if auctionType == 2 {
 				if bidAmount != "0" {
 					item["currentBidAsset"] = item["auctionAsset"]
-					item["currentBidAmount"] = item["bidAmount"].(primitive.Decimal128).String()
+					if amount, ok := asDecimalString(item["bidAmount"]); ok {
+						item["currentBidAmount"] = amount
+					}
 				} else {
 					item["currentBidAsset"] = item["auctionAsset"]
-					item["currentBidAmount"] = item["auctionAmount"].(primitive.Decimal128).String()
+					if amount, ok := asDecimalString(item["auctionAmount"]); ok {
+						item["currentBidAmount"] = amount
+					}
 				}
 			}
 		} else {
 			if auctionType == 2 && bidAmount != "0" {
 				item["lastSoldAsset"] = item["auctionAsset"]
-				item["lastSoldAmount"] = item["bidAmount"].(primitive.Decimal128).String()
+				if amount, ok := asDecimalString(item["bidAmount"]); ok {
+					item["lastSoldAmount"] = amount
+				}
 			}
 		}
 
 		if item["eventlist"] != nil {
-			eventlist := item["eventlist"].(primitive.A)
+			eventlist, ok := toPrimitiveA(item["eventlist"])
+			if !ok {
+				delete(item, "eventlist")
+				continue
+			}
 			for _, it := range eventlist {
-				eventItem := it.(map[string]interface{})
-				eventname := eventItem["eventname"]
-				extendData := eventItem["extendData"]
+				eventItem, ok := toMap(it)
+				if !ok {
+					continue
+				}
+				eventname, _ := toString(eventItem["eventname"])
+				extendData, _ := toString(eventItem["extendData"])
 				//market := eventItem["market"].(string)
 
 				var finishTime int64
 				data := make(map[string]interface{})
-				if err := json.Unmarshal([]byte(extendData.(string)), &data); err == nil {
+				if extendData == "" {
+					continue
+				}
+				if err := json.Unmarshal([]byte(extendData), &data); err == nil {
 					if eventname == "Claim" {
-						finishTime = eventItem["timestamp"].(int64)
+						if ts, ok := asInt64(eventItem["timestamp"]); ok {
+							finishTime = ts
+						}
 						item["lastSoldAsset"] = data["auctionAsset"]
 						item["lastSoldAmount"] = data["bidAmount"]
 					} else if eventname == "CompleteOffer" || eventname == "CompleteOfferCollection" {
-						time := eventItem["timestamp"].(int64)
+						time, ok := asInt64(eventItem["timestamp"])
+						if !ok {
+							continue
+						}
 						if time > finishTime {
 							finishTime = time
 							item["lastSoldAsset"] = data["offerAsset"]
-							if err != nil {
-								return err
-							}
 							item["lastSoldAmount"] = data["offerAmount"]
 
 						}
@@ -160,21 +195,28 @@ func (me *T) GetInfoByNFTList(args struct {
 			}
 		}
 
-		//获取Owner 设置的nns信息
-		owner := item["owner"].(string)
-		var nns, userName string
-		if owner != "" {
-			nns, userName, err = GetNNSByAddress(owner)
-			if err != nil {
-				return err
-			}
-		}
-
-		item["nns"] = nns
-		item["userName"] = userName
 		delete(item, "eventlist")
-
 	}
+
+	// Batch fetch NNS data for all owners concurrently
+	ownerAddrs := make([]string, 0, len(r1))
+	for _, item := range r1 {
+		if owner, ok := item["owner"].(string); ok && owner != "" {
+			ownerAddrs = append(ownerAddrs, owner)
+		}
+	}
+	nnsResults := GetNNSByAddresses(ownerAddrs)
+	for _, item := range r1 {
+		owner, _ := item["owner"].(string)
+		if res, ok := nnsResults[owner]; ok && res.Err == nil {
+			item["nns"] = res.NNS
+			item["userName"] = res.UserName
+		} else {
+			item["nns"] = ""
+			item["userName"] = ""
+		}
+	}
+
 	//
 	rt := os.ExpandEnv("${RUNTIME}")
 	var market string
@@ -207,16 +249,37 @@ func (me *T) GetInfoByNFTList(args struct {
 
 	result := make(map[string]interface{})
 	for _, item := range r1 {
-		asset := item["asset"].(string)
-		tokenid := item["tokenid"].(string)
+		asset, ok := toString(item["asset"])
+		if !ok || asset == "" {
+			continue
+		}
+		tokenid, ok := toString(item["tokenid"])
+		if !ok || tokenid == "" {
+			continue
+		}
 		key := asset + tokenid
 		if raw[key] != nil {
-			value := raw[key].(map[string]interface{})
+			value, ok := toMap(raw[key])
+			if !ok {
+				item["offerAmount"] = "0"
+				item["offerAsset"] = ""
+				goto buildOrder
+			}
 			if len(value) > 0 {
-				deadline := value["deadline"].(int64)
+				deadline, ok := asInt64(value["deadline"])
+				if !ok {
+					item["offerAmount"] = "0"
+					item["offerAsset"] = ""
+					goto buildOrder
+				}
 				if deadline > currentTime {
-					offerAmount := value["offerAmount"].(int64)
-					guarantee := value["guarantee"].(*big.Int)
+					offerAmount, ok := asInt64(value["offerAmount"])
+					guarantee, ok2 := asBigInt(value["guarantee"])
+					if !ok || !ok2 {
+						item["offerAmount"] = "0"
+						item["offerAsset"] = ""
+						goto buildOrder
+					}
 					amount := big.NewInt(offerAmount)
 					if guarantee.Cmp(amount) != -1 {
 						item["offerAmount"] = amount.String()
@@ -239,15 +302,20 @@ func (me *T) GetInfoByNFTList(args struct {
 			item["offerAsset"] = ""
 		}
 
+	buildOrder:
 		var order string
-		if item["buyNowAmount"] != "0" {
-			order = item["buyNowAmount"].(string)
-		} else if item["currentBidAmount"] != "0" {
-			order = item["currentBidAmount"].(string)
-		} else if item["lastSoldAmount"] != "0" {
-			order = item["lastSoldAmount"].(string)
+		if v, ok := asDecimalString(item["buyNowAmount"]); ok && v != "0" {
+			order = v
+		} else if v, ok := asDecimalString(item["currentBidAmount"]); ok && v != "0" {
+			order = v
+		} else if v, ok := asDecimalString(item["lastSoldAmount"]); ok && v != "0" {
+			order = v
 		} else {
-			order = item["offerAmount"].(string)
+			if v, ok := asDecimalString(item["offerAmount"]); ok {
+				order = v
+			} else {
+				order = "0"
+			}
 		}
 		number, err := strconv.ParseInt(order, 10, 64)
 		if err != nil {

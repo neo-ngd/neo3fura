@@ -32,7 +32,7 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 		args.Skip = 0
 	}
 	filter := bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}}
-	if args.Skip <= 0 && args.Cursor != "" {
+	if args.Cursor != "" {
 		cursorFilter, err := buildOIDDescCursorFilter(args.Cursor)
 		if err != nil {
 			return err
@@ -106,7 +106,7 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 		*args.Raw = page
 	}
 
-	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

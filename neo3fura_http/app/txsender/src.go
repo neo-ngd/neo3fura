@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"math/rand"
+	"neo3fura_http/lib/httpx"
 	log2 "neo3fura_http/lib/log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -34,15 +34,24 @@ func task() {
 			time.Sleep(time.Second)
 		}
 	}()
+	if len(addressesNEORPCPOPPER) == 0 || len(addressesNEOCLI) == 0 {
+		log2.Errorf("[txsender] empty upstream addresses")
+		time.Sleep(time.Second)
+		return
+	}
 	addressPOPPER := addressesNEORPCPOPPER[rand.Intn(len(addressesNEORPCPOPPER))]
-	resp, err := http.Get(addressPOPPER)
+	resp, err := httpx.Get(addressPOPPER)
 	if err != nil {
-		panic(err)
+		log2.Errorf("[txsender] popper request failed: %v", err)
+		time.Sleep(time.Second)
+		return
 	}
 	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		log2.Errorf("[txsender] read popper body failed: %v", err)
+		time.Sleep(time.Second)
+		return
 	}
 	payload, err := json.Marshal(map[string]interface{}{
 		"jsonrpc": "2.0",
@@ -58,11 +67,11 @@ func task() {
 
 	for i := time.Millisecond; i < time.Second; i = i * 2 {
 		addressNEOCLI := addressesNEOCLI[rand.Intn(len(addressesNEOCLI))]
-		resp, err := http.Post(addressNEOCLI, "application/json", bytes.NewReader(payload))
+		resp, err := httpx.Post(addressNEOCLI, "application/json", bytes.NewReader(payload))
 		if err != nil {
 			log2.Infof("[????][REQ]", err)
 			continue
 		}
-		defer resp.Body.Close()
+		resp.Body.Close()
 	}
 }

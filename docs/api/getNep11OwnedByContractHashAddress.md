@@ -10,6 +10,7 @@ Gets the Nep11 assets owned by the contract hash and user's address.
 | ContractHash    | string| The contract script hash | Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -23,6 +24,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetNep11OwnedByContractHashAddress",
   "params": {"Address":"0x2e9a0e6a68a4acce23ca14408bb4d0b803425394","ContractHash":"0xb3b65e5c0d2af3f98cac6e80083f6c2b90476f40","limit":3},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetNep11OwnedByContractHashAddress",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -74,7 +88,8 @@ Response body
                 "value": "1"
             }
         ],
-            "totalCount": 304
+            "totalCount": 304,
+        "nextCursor": "eyJmIjp7...}}"
     },
     "error": null
 }

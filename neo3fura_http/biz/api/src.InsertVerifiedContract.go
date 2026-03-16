@@ -26,8 +26,14 @@ func (me *T) InsertVerifiedContract(args struct {
 	clientOptions.SetMaxPoolSize(50)
 	co, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		log2.Fatalf("mongo connect error:%s", err)
+		log2.Errorf("mongo connect error:%s", err)
+		return stderr.ErrFind
 	}
+	defer func() {
+		if err := co.Disconnect(context.TODO()); err != nil {
+			log2.Errorf("mongo disconnect error:%s", err)
+		}
+	}()
 
 	client := &cli.T{
 		Redis:     me.Client.Redis,
@@ -53,6 +59,9 @@ func (me *T) InsertVerifiedContract(args struct {
 		Filter:     bson.M{"hash": args.ContractHash.Val()},
 		Query:      []string{},
 	}, ret)
+	if err != nil && err != stderr.ErrNotFound {
+		return err
+	}
 
 	if len(rr1) > 0 {
 		return stderr.ErrExistsDocument

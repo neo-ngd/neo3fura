@@ -27,6 +27,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 }'
 ```
 
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetAssetHoldersListByContractHash",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
+  "id": 1
+}'
+```
+
 Response body
 
 ```json5
@@ -116,7 +129,8 @@ Response body
         "tokenid": "RnJhZ21lbnQgQSAjMTgyNQ=="
       }
     ],
-    "totalCount": 3554
+    "totalCount": 3554,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

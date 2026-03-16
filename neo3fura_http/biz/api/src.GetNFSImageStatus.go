@@ -2,9 +2,8 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
+	"neo3fura_http/lib/httpx"
 	"neo3fura_http/lib/type/strval"
-	"net/http"
 )
 
 func (me *T) GetNFSImgStatus(args struct {
@@ -14,15 +13,11 @@ func (me *T) GetNFSImgStatus(args struct {
 
 	result := make(map[string]interface{})
 
-	resp, err := http.Get(args.Url.Val())
+	resp, err := httpx.Get(args.Url.Val())
 	if err != nil {
 		return err
 	}
-	fmt.Println(resp.Status)
-	if err != nil {
-		fmt.Println("Search imageId error")
-
-	}
+	defer resp.Body.Close()
 	if resp.StatusCode == 200 {
 		result["ImageStatus"] = true
 	} else {

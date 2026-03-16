@@ -9,12 +9,14 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
+	"neo3fura_http/lib/httpx"
 	log2 "neo3fura_http/lib/log"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 func (me *T) GetMarketIndexByAsset(args struct {
@@ -58,49 +60,55 @@ func (me *T) GetMarketIndexByAsset(args struct {
 
 func GetPrice(asset string) (float64, error) {
 
-	client := &http.Client{}
 	reqBody := []byte(`["` + asset + `"]`)
 	url := "https://onegate.space/api/quote?convert=usd"
-	//str :=[]string{asset}
-	req, _ :=
-		http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
-		log2.Fatal("request price err :", err)
+		log2.Errorf("build request price error: %v", err)
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := httpx.Do(req)
+	if err != nil {
+		log2.Errorf("request price err: %v", err)
 		return 0, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("request price status error: %d", resp.StatusCode)
+	}
 	body, err := ioutil.ReadAll(resp.Body)
 
 	if err != nil {
-		log2.Fatal("readall price err :", err)
+		log2.Errorf("readall price err: %v", err)
 		return 0, err
 	}
-	response := string(body)
+	response := strings.TrimSpace(string(body))
+	if len(response) < 2 {
+		return 0, fmt.Errorf("invalid quote response: %s", response)
+	}
 	re := response[1 : len(response)-1]
 	price, err1 := strconv.ParseFloat(re, 64)
 	if err1 != nil {
-		log2.Fatal("price parsefloat err :", err)
-		return 0, err
+		log2.Errorf("price parsefloat err: %v", err1)
+		return 0, err1
 	}
 	price, err = strconv.ParseFloat(fmt.Sprintf("%.8f", price), 64)
 	if err != nil {
-		log2.Fatal("price parsefloat decimal err :", err)
+		log2.Errorf("price parsefloat decimal err: %v", err)
 		return 0, err
 	}
 	return price, nil
 }
 func GetPrice2(asset string, amount primitive.Decimal128) (*big.Float, error) {
 
-	client := &http.Client{}
 	reqBody := []byte(`["` + asset + `"]`)
 	url := "https://onegate.space/api/quote?convert=usd"
 	//str :=[]string{asset}
 	req, _ :=
 		http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := httpx.Do(req)
 	if err != nil {
 		return big.NewFloat(float64(0)), stderr.ErrPrice
 	}
@@ -151,13 +159,13 @@ func OpenAssetHashFile() (map[string]int64, error) {
 
 	b, err := ioutil.ReadFile(absPath)
 	if err != nil {
-		fmt.Print(err)
+		return nil, err
 	}
 	whitelist := map[string]int64{}
 	err = json.Unmarshal([]byte(string(b)), &whitelist)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return whitelist, err
+	return whitelist, nil
 }

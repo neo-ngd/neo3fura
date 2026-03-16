@@ -21,7 +21,7 @@ func (me *T) GetTotalSentAndReceivedByContractHashAddress(args struct {
 	if args.ContractHash.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-	r1, _, err := me.Client.QueryAll(struct {
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -29,6 +29,7 @@ func (me *T) GetTotalSentAndReceivedByContractHashAddress(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "TransferNotification",
 		Index:      "GetNep17TransferByAddress",
@@ -38,6 +39,7 @@ func (me *T) GetTotalSentAndReceivedByContractHashAddress(args struct {
 			bson.M{"to": args.Address.TransferredVal()},
 		}, "contract": args.ContractHash.Val()},
 		Query: []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
 		return err

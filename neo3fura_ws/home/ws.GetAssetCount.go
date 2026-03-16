@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
+	log2 "neo3fura_ws/lib/log"
 )
 
 // Asset
@@ -24,23 +24,27 @@ func (me *T) GetAssetCount(ch *chan map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	defer cs.Close(context.TODO())
 	// Whenever there is a new change event, decode the change event and print some information about it
 	for cs.Next(context.TODO()) {
 		var changeEvent map[string]interface{}
 		err := cs.Decode(&changeEvent)
 		if err != nil {
-			log.Fatal(err)
+			log2.Errorf("GetAssetCount decode change event failed: %v", err)
+			continue
 		}
 		newAssetCount, err := me.getAssetCount()
 		if err != nil {
 			return err
 		}
-		if assetCount["AssetCount"].(map[string]interface{})["total counts"] != newAssetCount["AssetCount"].(map[string]interface{})["total counts"] {
+		oldTotal, okOld := extractTotalCounts(assetCount["AssetCount"])
+		newTotal, okNew := extractTotalCounts(newAssetCount["AssetCount"])
+		if !okOld || !okNew || oldTotal != newTotal {
 			*ch <- newAssetCount
 			assetCount = newAssetCount
 		}
 	}
-	return nil
+	return cs.Err()
 }
 
 func (me T) getAssetCount() (map[string]interface{}, error) {

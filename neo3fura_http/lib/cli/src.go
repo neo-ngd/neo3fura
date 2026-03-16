@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"strconv"
+
+	"sort"
 	"strings"
-	"time"
+
 
 	"github.com/go-redis/redis/v8"
 	"github.com/joeqian10/neo3-gogogo/rpc"
@@ -48,6 +48,16 @@ type SourceCode struct {
 	Updatecounter int32
 	Filename      string
 	Code          string
+}
+
+
+func sortedBsonKeys(m bson.M) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func normalizeLimit(limit int64) int64 {
@@ -150,6 +160,7 @@ func queryTimeoutDuration() time.Duration {
 		ms = 15000
 	}
 	return time.Duration(ms) * time.Millisecond
+
 }
 
 func (me *T) GetCollection(args struct {
@@ -166,20 +177,24 @@ func (me *T) QueryOne(args struct {
 	Filter     bson.M
 	Query      []string
 }, ret *json.RawMessage) (map[string]interface{}, error) {
-	var kvs string
-	kvs = kvs + args.Collection
-	kvs = kvs + args.Index
-	for k, v := range args.Sort {
-		kvs = kvs + k + fmt.Sprintf("%v", v)
+	var sb strings.Builder
+	sb.WriteString(args.Collection)
+	sb.WriteString(args.Index)
+	for _, k := range sortedBsonKeys(args.Sort) {
+		v := args.Sort[k]
+		sb.WriteString(k)
+		fmt.Fprintf(&sb, "%v", v)
 	}
-	for k, v := range args.Filter {
-		kvs = kvs + k + fmt.Sprintf("%v", v)
+	for _, k := range sortedBsonKeys(args.Filter) {
+		v := args.Filter[k]
+		sb.WriteString(k)
+		fmt.Fprintf(&sb, "%v", v)
 	}
 	for _, v := range args.Query {
-		kvs = kvs + v
+		sb.WriteString(v)
 	}
 	h := sha1.New()
-	h.Write([]byte(kvs))
+	h.Write([]byte(sb.String()))
 	hash := hex.EncodeToString(h.Sum(nil))
 	val, err := me.Redis.Get(me.Ctx, hash).Result()
 	// if sort != nil, it may have several results, we have to pick the sorted one
@@ -192,7 +207,6 @@ func (me *T) QueryOne(args struct {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, stderr.ErrNotFound
 		} else if err != nil {
-			fmt.Println(1)
 			return nil, stderr.ErrFind
 		}
 		if len(args.Query) == 0 {
@@ -204,19 +218,17 @@ func (me *T) QueryOne(args struct {
 		}
 		r, err := json.Marshal(convert)
 		if err != nil {
-			fmt.Println(2)
 			return nil, stderr.ErrFind
 		}
-		//err = me.Redis.Set(me.Ctx, hash, hex.EncodeToString(r), 0).Err()
-		//if err != nil {
-		//	return nil, stderr.ErrFind
-		//}
+		err = me.Redis.Set(me.Ctx, hash, hex.EncodeToString(r), 0).Err()
+		if err != nil {
+			log2.Infof("Redis cache set error: %v", err)
+		}
 		*ret = json.RawMessage(r)
 		return convert, nil
 	} else {
 		r, err := hex.DecodeString(val)
 		if err != nil {
-			fmt.Println(3)
 			return nil, stderr.ErrFind
 		}
 
@@ -227,12 +239,10 @@ func (me *T) QueryOne(args struct {
 			convert["_id"], err = primitive.ObjectIDFromHex(convert["_id"].(string))
 		}
 		if err != nil {
-			fmt.Println(4)
 			return nil, stderr.ErrFind
 		}
 		return convert, nil
 	}
-	return nil, nil
 }
 
 func (me *T) QueryAll(args struct {
@@ -274,21 +284,101 @@ func (me *T) QueryAll(args struct {
 	if err != nil {
 		return nil, 0, stderr.ErrFind
 	}
-	cursor, err := collection.Find(queryCtx, args.Filter, op)
+
+	cursor, err := collection.Find(me.Ctx, args.Filter, op)
 	if err == mongo.ErrNoDocuments {
-		fmt.Println("TEST1", args.Collection)
+
 		return nil, 0, stderr.ErrNotFound
 	}
 	if err != nil {
 		return nil, 0, stderr.ErrFind
 	}
 	defer func() {
-		err := cursor.Close(queryCtx)
-		if err != nil {
-			log2.Warnf("Closing cursor error %v", err)
+
+		if err := cursor.Close(me.Ctx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(queryCtx, &results); err != nil {
+	if err = cursor.All(me.Ctx, &results); err != nil {
+
+		return nil, 0, stderr.ErrFind
+	}
+	for _, item := range results {
+		if len(args.Query) == 0 {
+			convert = append(convert, item)
+		} else {
+			temp := make(map[string]interface{})
+			for _, v := range args.Query {
+				temp[v] = item[v]
+			}
+			convert = append(convert, temp)
+		}
+	}
+	r, err := json.Marshal(convert)
+	if err != nil {
+		return nil, 0, stderr.ErrFind
+	}
+	*ret = json.RawMessage(r)
+	return convert, count, nil
+}
+
+// QueryAllWithCursor is like QueryAll but supports cursor-based pagination.
+// When CursorFilter is non-nil, it is merged with Filter using $and, and Skip is ignored (set to 0).
+func (me *T) QueryAllWithCursor(args struct {
+	Collection   string
+	Index        string
+	Sort         bson.M
+	Filter       bson.M
+	Query        []string
+	Limit        int64
+	Skip         int64
+	CursorFilter bson.M
+}, ret *json.RawMessage) ([]map[string]interface{}, int64, error) {
+
+	if args.Limit == 0 {
+		args.Limit = consts.DefaultLimit
+	} else if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
+
+	// Merge cursor filter if provided
+	queryFilter := args.Filter
+	skip := args.Skip
+	if args.CursorFilter != nil {
+		if queryFilter == nil || len(queryFilter) == 0 {
+			queryFilter = args.CursorFilter
+		} else {
+			queryFilter = bson.M{"$and": []interface{}{args.Filter, args.CursorFilter}}
+		}
+		skip = 0
+	}
+
+	var results []map[string]interface{}
+	convert := make([]map[string]interface{}, 0)
+	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
+	op := options.Find()
+	op.SetSort(args.Sort)
+	op.SetLimit(args.Limit)
+	op.SetSkip(skip)
+	co := options.CountOptions{}
+	// Count uses original filter (without cursor) for total count
+	count, err := collection.CountDocuments(me.Ctx, args.Filter, &co)
+	if err != nil {
+		return nil, 0, stderr.ErrFind
+	}
+	cursor, err := collection.Find(me.Ctx, queryFilter, op)
+	if err == mongo.ErrNoDocuments {
+		return nil, 0, stderr.ErrNotFound
+	}
+	if err != nil {
+		return nil, 0, stderr.ErrFind
+	}
+	defer func() {
+		if err := cursor.Close(me.Ctx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
+		}
+	}()
+	if err = cursor.All(me.Ctx, &results); err != nil {
 		return nil, 0, stderr.ErrFind
 	}
 	for _, item := range results {
@@ -403,10 +493,8 @@ func (me *T) QueryLastJob(args struct {
 	opts := options.FindOne().SetSort(bson.M{"_id": -1})
 	err := collection.FindOne(me.Ctx, bson.M{}, opts).Decode(&result)
 	if err == mongo.ErrNoDocuments {
-		fmt.Println("TEST2", args.Collection)
 		return nil, stderr.ErrNotFound
 	}
-
 	if err != nil {
 		return nil, stderr.ErrFind
 	}
@@ -433,21 +521,19 @@ func (me *T) QueryLastJobs(args struct {
 	op.SetSort(args.Sort)
 	op.SetLimit(args.Limit)
 	op.SetSkip(args.Skip)
-	cursor, err := collection.Find(queryCtx, args.Filter, op)
+	cursor, err := collection.Find(me.Ctx, args.Filter, op)
 	if err == mongo.ErrNoDocuments {
-		fmt.Println("TEST3", args.Collection)
 		return nil, stderr.ErrNotFound
 	}
 	if err != nil {
 		return nil, stderr.ErrFind
 	}
 	defer func() {
-		err := cursor.Close(queryCtx)
-		if err != nil {
-			log2.Warnf("Closing cursor error %v", err)
+		if err := cursor.Close(me.Ctx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(queryCtx, &results); err != nil {
+	if err = cursor.All(me.Ctx, &results); err != nil {
 		return nil, stderr.ErrFind
 	}
 	return results, nil
@@ -471,21 +557,19 @@ func (me *T) QueryAggregate(args struct {
 	op := options.AggregateOptions{}
 	op.SetAllowDiskUse(true)
 
-	cursor, err := collection.Aggregate(queryCtx, args.Pipeline, &op)
+	cursor, err := collection.Aggregate(me.Ctx, args.Pipeline, &op)
 	if err == mongo.ErrNoDocuments {
-		fmt.Println("TEST4", args.Collection)
 		return nil, stderr.ErrNotFound
 	}
 	if err != nil {
 		return nil, stderr.ErrFind
 	}
 	defer func() {
-		err := cursor.Close(queryCtx)
-		if err != nil {
-			log2.Warnf("Closing cursor error %v", err)
+		if err := cursor.Close(me.Ctx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(queryCtx, &results); err != nil {
+	if err = cursor.All(me.Ctx, &results); err != nil {
 		return nil, stderr.ErrFind
 	}
 
@@ -526,21 +610,19 @@ func (me *T) QueryAggregateJob(args struct {
 	defer cancel()
 	op := options.AggregateOptions{}
 
-	cursor, err := collection.Aggregate(queryCtx, args.Pipeline, &op)
+	cursor, err := collection.Aggregate(me.Ctx, args.Pipeline, &op)
 	if err == mongo.ErrNoDocuments {
-		fmt.Println("TEST5", args.Collection)
 		return nil, stderr.ErrNotFound
 	}
 	if err != nil {
 		return nil, stderr.ErrFind
 	}
 	defer func() {
-		err := cursor.Close(queryCtx)
-		if err != nil {
-			log2.Warnf("Closing cursor error %v", err)
+		if err := cursor.Close(me.Ctx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(queryCtx, &results); err != nil {
+	if err = cursor.All(me.Ctx, &results); err != nil {
 		return nil, stderr.ErrFind
 	}
 
@@ -584,7 +666,6 @@ func (me *T) QueryDocument(args struct {
 		count, err = collection.CountDocuments(queryCtx, args.Filter, &co)
 	}
 	if err == mongo.ErrNoDocuments {
-		fmt.Println("TEST6", args.Collection)
 		return nil, stderr.ErrNotFound
 	}
 	if err != nil {
@@ -619,21 +700,17 @@ func (me *T) GetDistinctCount(args struct {
 	args.Pipeline = append(args.Pipeline, pipeline)
 	args.Pipeline = append(args.Pipeline, bson.M{"$count": "count"})
 	cursor, err := collection.Aggregate(me.Ctx, args.Pipeline, &op)
-
-	defer func(cursor *mongo.Cursor, ctx context.Context) {
-		err := cursor.Close(ctx)
-		if err != nil {
-			log2.Fatalf("Closing cursor error %v", err)
-		}
-	}(cursor, me.Ctx)
 	if err == mongo.ErrNoDocuments {
-		fmt.Println("", args.Collection)
-
 		return nil, stderr.ErrNotFound
 	}
 	if err != nil {
 		return nil, stderr.ErrFind
 	}
+	defer func() {
+		if err := cursor.Close(me.Ctx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
+		}
+	}()
 
 	if err = cursor.All(me.Ctx, &results); err != nil {
 		return nil, stderr.ErrFind

@@ -35,7 +35,7 @@ func (me *T) GetApplicationLogByTransactionHash(args struct {
 		return err
 	}
 
-	r2, _, err := me.Client.QueryAll(struct {
+	r2, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -43,7 +43,8 @@ func (me *T) GetApplicationLogByTransactionHash(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
-	}{Collection: "Notification", Index: "GetApplicationLogByBlockHash", Sort: bson.M{}, Filter: bson.M{"txid": r1["txid"].(string), "blockhash": r1["blockhash"].(string)}}, ret)
+		CursorFilter bson.M
+	}{Collection: "Notification", Index: "GetApplicationLogByBlockHash", Sort: bson.M{}, Filter: bson.M{"txid": r1["txid"].(string), "blockhash": r1["blockhash"].(string)}, CursorFilter: nil}, ret)
 	if err != nil {
 		return err
 	}

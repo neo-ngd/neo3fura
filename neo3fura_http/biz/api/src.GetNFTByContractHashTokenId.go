@@ -328,20 +328,28 @@ func (me *T) GetNFTByContractHashTokenId(args struct {
 			}
 		}
 
-		owner := item["owner"].(string)
-		var nns, userName string
-		if owner != "" {
-			nns, userName, err = GetNNSByAddress(owner)
-			if err != nil {
-				return err
-			}
-		}
-		item["nns"] = nns
-		item["userName"] = userName
-
 	}
 
-	r5, err := me.FilterArrayAndAppendCount(rr1, int64(len(rr1)), args.Filter)
+	// Batch fetch NNS data for all owners concurrently
+	ownerAddrs := make([]string, 0, len(rr1))
+	for _, item := range rr1 {
+		if owner, ok := item["owner"].(string); ok && owner != "" {
+			ownerAddrs = append(ownerAddrs, owner)
+		}
+	}
+	nnsResults := GetNNSByAddresses(ownerAddrs)
+	for _, item := range rr1 {
+		owner, _ := item["owner"].(string)
+		if res, ok := nnsResults[owner]; ok && res.Err == nil {
+			item["nns"] = res.NNS
+			item["userName"] = res.UserName
+		} else {
+			item["nns"] = ""
+			item["userName"] = ""
+		}
+	}
+
+	r5, err := me.FilterArrayAndAppendCountWithCursor(rr1, int64(len(rr1)), args.Filter, []string{"_id"})
 	if err != nil {
 		return err
 	}

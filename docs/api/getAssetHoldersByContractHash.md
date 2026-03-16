@@ -9,6 +9,7 @@ Gets the asset holders with the contract script hash.
 | ContractHash     | string| The contract script hash | Required|
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
@@ -21,6 +22,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetAssetHoldersByContractHash",
   "params": {"ContractHash":"0xd2a4cff31913016155e38e474a2c06d08be276cf","Limit":2},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetAssetHoldersByContractHash",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -50,7 +64,8 @@ Response body
         "tokenid": ""
       }
     ],
-    "totalCount": 596
+    "totalCount": 596,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

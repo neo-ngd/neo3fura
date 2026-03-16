@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/joeqian10/neo3-gogogo/crypto"
 	"github.com/joeqian10/neo3-gogogo/helper"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,6 +15,7 @@ func (me *T) GetNep17TransferByTransactionHash(args struct {
 	TransactionHash h256.T
 	Limit           int64
 	Skip            int64
+	Cursor          string
 	Filter          map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.TransactionHash.Valid() == false {
@@ -44,25 +46,39 @@ func (me *T) GetNep17TransferByTransactionHash(args struct {
 		return err
 	}
 
+	sortKeys := []string{"index"}
+	sortDirs := map[string]int{"index": 1}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		cursorValues, err := DecodeCursor(args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+	}
+
 	r1 := make([]map[string]interface{}, 0)
 	count := int64(0)
 	if len(r11) > 0 {
-		r1, count, err = me.Client.QueryAll(struct {
-			Collection string
-			Index      string
-			Sort       bson.M
-			Filter     bson.M
-			Query      []string
-			Limit      int64
-			Skip       int64
+		r1, count, err = me.Client.QueryAllWithCursor(struct {
+			Collection   string
+			Index        string
+			Sort         bson.M
+			Filter       bson.M
+			Query        []string
+			Limit        int64
+			Skip         int64
+			CursorFilter bson.M
 		}{
-			Collection: "Notification",
-			Index:      "GetNep17TransferByTransactionHash",
-			Sort:       bson.M{"index": 1},
-			Filter:     bson.M{"eventname": "Transfer", "txid": args.TransactionHash.Val()},
-			Query:      []string{},
-			Limit:      args.Limit,
-			Skip:       args.Skip,
+			Collection:   "Notification",
+			Index:        "GetNep17TransferByTransactionHash",
+			Sort:         bson.M{"index": 1},
+			Filter:       bson.M{"eventname": "Transfer", "txid": args.TransactionHash.Val()},
+			Query:        []string{},
+			Limit:        args.Limit,
+			Skip:         args.Skip,
+			CursorFilter: cursorFilter,
 		}, ret)
 		if err != nil {
 			return err
@@ -121,7 +137,7 @@ func (me *T) GetNep17TransferByTransactionHash(args struct {
 				item["decimals"] = r["decimals"]
 				item["symbol"] = r["symbol"]
 
-			} else if err.Error() == "NOT FOUND" {
+			} else if errors.Is(err, stderr.ErrNotFound) {
 				item["tokenname"] = ""
 				item["decimals"] = ""
 				item["symbol"] = ""
@@ -131,7 +147,7 @@ func (me *T) GetNep17TransferByTransactionHash(args struct {
 		}
 	}
 
-	r2, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

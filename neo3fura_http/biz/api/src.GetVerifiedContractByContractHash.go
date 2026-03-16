@@ -33,8 +33,14 @@ func (me *T) GetVerifiedContractByContractHash(args struct {
 	clientOptions.SetMaxPoolSize(50)
 	co, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		log2.Fatalf("mongo connect error:%s", err)
+		log2.Errorf("mongo connect error:%s", err)
+		return stderr.ErrFind
 	}
+	defer func() {
+		if err := co.Disconnect(context.TODO()); err != nil {
+			log2.Errorf("mongo disconnect error:%s", err)
+		}
+	}()
 
 	client := &cli.T{
 		Redis:     me.Client.Redis,

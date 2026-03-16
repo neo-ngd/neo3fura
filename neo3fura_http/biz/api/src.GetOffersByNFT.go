@@ -19,6 +19,7 @@ func (me *T) GetOffersByNFT(args struct {
 	MarketHash h160.T
 	Limit      int64
 	Skip       int64
+	Cursor     string
 	Filter     map[string]interface{}
 	Raw        *map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -29,6 +30,10 @@ func (me *T) GetOffersByNFT(args struct {
 		return stderr.ErrInvalidArgs
 	}
 	currentTime := time.Now().UnixNano() / 1e6
+
+	sortKeys := []string{"timestamp"}
+	sortDirs := map[string]int{"timestamp": -1}
+
 	pipeline := []bson.M{
 		bson.M{"$match": bson.M{"market": args.MarketHash.Val(),
 			"$or": []interface{}{
@@ -37,6 +42,23 @@ func (me *T) GetOffersByNFT(args struct {
 			},
 		}},
 
+		bson.M{"$sort": bson.M{"timestamp": -1}},
+	}
+
+	if args.Cursor != "" {
+		cursorMatch, err := BuildCursorMatchStage(sortKeys, sortDirs, args.Cursor)
+		if err != nil {
+			return err
+		}
+		if cursorMatch != nil {
+			pipeline = append(pipeline, cursorMatch)
+		}
+	} else {
+		pipeline = append(pipeline, bson.M{"$skip": args.Skip})
+	}
+
+	pipeline = append(pipeline,
+		bson.M{"$limit": args.Limit},
 		bson.M{"$lookup": bson.M{
 			"from": "Nep11Properties",
 			"let":  bson.M{"asset": "$asset", "tokenid": "$tokenid"},
@@ -49,11 +71,7 @@ func (me *T) GetOffersByNFT(args struct {
 			},
 			"as": "properties"},
 		},
-
-		bson.M{"$sort": bson.M{"timestamp": -1}},
-		bson.M{"$limit": args.Limit},
-		bson.M{"$skip": args.Skip},
-	}
+	)
 
 	var r1, err = me.Client.QueryAggregate(
 		struct {
@@ -299,7 +317,7 @@ func (me *T) GetOffersByNFT(args struct {
 		result = append(result, item)
 	}
 	count := int64(len(result))
-	r2, err := me.FilterArrayAndAppendCount(result, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(result, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

@@ -9,6 +9,7 @@ Gets the applicationlog by the given blockhash.
 | BlockHash     | string| BlockHash of the transaction | Required|
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
@@ -21,6 +22,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetApplicationLogByBlockHash",
   "params": {"BlockHash": "0xf6ba8db5c013834890903a30a4ce0d65ec5da2addaf4799f15efbedaff42c56f" },
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetApplicationLogByBlockHash",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -114,7 +128,8 @@ Response body
                 "vmstate": "HALT"
             }
         ],
-        "totalCount": 2
+        "totalCount": 2,
+        "nextCursor": "eyJmIjp7...}}"
     },
     "error": null
 }

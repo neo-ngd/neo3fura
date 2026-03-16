@@ -9,6 +9,7 @@ Gets the contract list by the given name (fuzzy search supported)
 | Name     | string|  The contract name (fuzzy search supported)| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
@@ -57,7 +58,8 @@ Response body
         "updatecounter": 0
       }
     ],
-    "totalCount": 2
+    "totalCount": 2,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

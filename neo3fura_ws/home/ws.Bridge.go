@@ -2,9 +2,8 @@ package home
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"log"
+	log2 "neo3fura_ws/lib/log"
 )
 
 // bridge
@@ -34,17 +33,33 @@ func (me *T) GetBridge(contract string, nonce int32, ch *chan map[string]interfa
 		var changeEvent map[string]interface{}
 		err := cs.Decode(&changeEvent)
 		if err != nil {
-			log.Fatal(err)
+			log2.Errorf("GetBridge decode change event failed: %v", err)
+			continue
 		}
-		fullDocument := changeEvent["fullDocument"].(map[string]interface{})
-		contractAdd := fullDocument["contract"]
-		eventName := fullDocument["eventname"]
+		fullDocument, ok := asMap(changeEvent["fullDocument"])
+		if !ok {
+			continue
+		}
+		contractAdd, _ := asString(fullDocument["contract"])
+		eventName, _ := asString(fullDocument["eventname"])
 		if contractAdd == contract {
 			if eventName == "Withdrawal" || eventName == "Claimable" {
-				state := fullDocument["state"].(map[string]interface{})
-				stateValue := state["value"].(primitive.A)
-				event := stateValue[0].(map[string]interface{})
-				eventNonce := event["value"].(int32)
+				state, ok := asMap(fullDocument["state"])
+				if !ok {
+					continue
+				}
+				stateValue, ok := asPrimitiveA(state["value"])
+				if !ok || len(stateValue) == 0 {
+					continue
+				}
+				event, ok := asMap(stateValue[0])
+				if !ok {
+					continue
+				}
+				eventNonce, ok := asInt32(event["value"])
+				if !ok {
+					continue
+				}
 				if nonce == eventNonce {
 					*ch <- fullDocument
 				}
@@ -53,5 +68,5 @@ func (me *T) GetBridge(contract string, nonce int32, ch *chan map[string]interfa
 		}
 
 	}
-	return nil
+	return cs.Err()
 }

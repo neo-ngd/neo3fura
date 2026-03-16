@@ -12,6 +12,7 @@ func (me *T) GetNep11TransferByBlockHeight(args struct {
 	BlockHeight uintval.T
 	Limit       int64
 	Skip        int64
+	Cursor      string
 	Filter      map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.BlockHeight.Valid() == false {
@@ -38,26 +39,42 @@ func (me *T) GetNep11TransferByBlockHeight(args struct {
 		return err
 	}
 
-	r2, count, err2 := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		cursorValues, err := DecodeCursor(args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+	}
+
+	r2, count, err2 := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Nep11TransferNotification",
-		Index:      "GetNep11TransferByBlockHeight",
-		Sort:       bson.M{},
-		Filter:     bson.M{"timestamp": r1["timestamp"]},
-		Query:      []string{},
+		Collection:   "Nep11TransferNotification",
+		Index:        "GetNep11TransferByBlockHeight",
+		Sort:         bson.M{},
+		Filter:       bson.M{"timestamp": r1["timestamp"]},
+		Query:        []string{},
+		Limit:        args.Limit,
+		Skip:         args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err2 != nil {
 		return err2
 	}
 
-	r3, err := me.FilterArrayAndAppendCount(r2, count, args.Filter)
+	r3, err := me.FilterArrayAndAppendCountWithCursor(r2, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

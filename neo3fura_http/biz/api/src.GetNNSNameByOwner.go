@@ -15,6 +15,7 @@ func (me *T) GetNNSNameByOwner(args struct {
 	Owner  h160.T
 	Limit  int64
 	Skip   int64
+	Cursor string
 	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
 

@@ -9,6 +9,7 @@ Get voters by the candidate address.
 | CandidateAddress     | string|  The candidate address| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 ### Example
 
@@ -21,6 +22,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetVotersByCandidateAddress",
   "params": {"CandidateAddress":"0x0bf916d727c75f2e51e1ab2c476304513da59701","Limit":2},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetVotersByCandidateAddress",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -53,7 +67,8 @@ Response body
         "voter": "0x1fbd5663d504c4ee04eef89548c8b4953550c67d"
       }
     ],
-    "totalCount": 12
+    "totalCount": 12,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

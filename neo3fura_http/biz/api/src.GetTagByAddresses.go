@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math"
 	"math/big"
@@ -110,7 +109,6 @@ func (me *T) GetTagByAddresses(args struct {
 		},
 		Query: []string{},
 	}, ret)
-	fmt.Println(r3)
 	if err != nil {
 		return err
 	}
@@ -145,7 +143,6 @@ func (me *T) GetTagByAddresses(args struct {
 		//to
 		for _, toItem := range r2 {
 			address_contract := toItem["_id"].(map[string]interface{})
-			fmt.Println(address_contract["address"], ",", item, ",", address_contract["address"] == item)
 			if address_contract["address"].(string) == item.Val() {
 				if address_contract["contract"].(string) == consts.NEO {
 					neoSum, _, err := toItem["sum"].(primitive.Decimal128).BigInt()

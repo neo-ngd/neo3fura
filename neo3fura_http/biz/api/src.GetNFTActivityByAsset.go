@@ -341,35 +341,38 @@ func (me *T) GetNFTActivityByAsset(args struct {
 				} else {
 					r2["state"] = NFTevent.Offer_Expired
 				}
-				fromAddress := ""
-				toAddress := ""
-				if r2["from"] != nil {
-					fromAddress = r2["from"].(string)
-				}
-				if r2["to"] != nil {
-					toAddress = r2["to"].(string)
-				}
-				var fromNNS, fromUserName string
-				var toNNS, toUserName string
-				if fromAddress != "" {
-					fromNNS, fromUserName, err = GetNNSByAddress(fromAddress)
-					if err != nil {
-						return err
-					}
-				}
-				if toAddress != "" {
-					toNNS, toUserName, err = GetNNSByAddress(toAddress)
-					if err != nil {
-						return err
-					}
-				}
-				r2["from_nns"] = fromNNS
-				r2["to_nns"] = toNNS
-				r2["from_userName"] = fromUserName
-				r2["to_userName"] = toUserName
-
 				result = append(result, r2)
 			}
+		}
+	}
+
+	// Batch fetch NNS data for all from/to addresses concurrently
+	allAddrs := make([]string, 0, len(result)*2)
+	for _, rr := range result {
+		if from, ok := rr["from"].(string); ok && from != "" {
+			allAddrs = append(allAddrs, from)
+		}
+		if to, ok := rr["to"].(string); ok && to != "" {
+			allAddrs = append(allAddrs, to)
+		}
+	}
+	nnsResults := GetNNSByAddresses(allAddrs)
+	for _, rr := range result {
+		fromAddr, _ := rr["from"].(string)
+		toAddr, _ := rr["to"].(string)
+		if res, ok := nnsResults[fromAddr]; ok && res.Err == nil {
+			rr["from_nns"] = res.NNS
+			rr["from_userName"] = res.UserName
+		} else {
+			rr["from_nns"] = ""
+			rr["from_userName"] = ""
+		}
+		if res, ok := nnsResults[toAddr]; ok && res.Err == nil {
+			rr["to_nns"] = res.NNS
+			rr["to_userName"] = res.UserName
+		} else {
+			rr["to_nns"] = ""
+			rr["to_userName"] = ""
 		}
 	}
 

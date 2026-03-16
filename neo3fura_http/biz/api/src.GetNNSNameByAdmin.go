@@ -17,6 +17,7 @@ func (me *T) GetNNSNameByAdmin(args struct {
 	Admin  h160.T
 	Limit  int64
 	Skip   int64
+	Cursor string
 	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
 

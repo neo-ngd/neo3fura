@@ -17,6 +17,7 @@ func (me *T) GetTransferTxByAddressAsset(args struct {
 	//EndTime   uint64
 	Limit  int64
 	Skip   int64
+		Cursor      string
 	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
 	f := bson.M{}
@@ -32,7 +33,19 @@ func (me *T) GetTransferTxByAddressAsset(args struct {
 		bson.M{"timestamp": bson.M{"$lte": 1744430400000}},
 	}
 
-	r1, count, err1 := me.Client.QueryAll(struct {
+	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		cursorValues, err := DecodeCursor(args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+	}
+
+	r1, count, err1 := me.Client.QueryAllWithCursor(struct {
 		Collection string
 		Index      string
 		Sort       bson.M
@@ -40,6 +53,7 @@ func (me *T) GetTransferTxByAddressAsset(args struct {
 		Query      []string
 		Limit      int64
 		Skip       int64
+		CursorFilter bson.M
 	}{
 		Collection: "TransferNotification",
 		Index:      "TransferNotification",
@@ -48,12 +62,13 @@ func (me *T) GetTransferTxByAddressAsset(args struct {
 		Query:      []string{"from", "to", "value", "timestamp", "txid"},
 		Limit:      args.Limit,
 		Skip:       args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err1 != nil {
 		return err1
 	}
 
-	r5, err := me.FilterArrayAndAppendCount(r1, count, args.Filter)
+	r5, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

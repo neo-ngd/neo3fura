@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
+	"neo3fura_http/lib/httpx"
 	"neo3fura_http/lib/joh"
 	log2 "neo3fura_http/lib/log"
 	"neo3fura_http/lib/type/Contract"
@@ -191,7 +192,7 @@ func (me *T) GetMarketCollections(args struct {
 										}
 										ss := string(tb[:])
 										if ss == "" {
-											log2.Fatal(item["asset"], item["tokenid"], item["image"])
+											log2.Errorf("empty thumbnail payload for asset=%v tokenid=%v image=%v", item["asset"], item["tokenid"], item["image"])
 											item["thumbnail"] = ImagUrl(item["asset"].(string), item["image"].(string), "thumbnail")
 										} else {
 											item["thumbnail"] = ImagUrl(asset, string(tb[:]), "thumbnail")
@@ -319,9 +320,13 @@ func (me *T) GetUserSavingsAmount(contract h160.T, user h160.T, asset h160.T) (*
 	h := &joh.T{}
 	c, err := h.OpenConfigFile()
 	if err != nil {
-		log2.Fatalf("Open config file error:%s", err)
+		log2.Errorf("Open config file error:%s", err)
+		return big.NewInt(0), err
 	}
 	nodes := c.Proxy.URI
+	if len(nodes) == 0 {
+		return big.NewInt(0), stderr.ErrFind
+	}
 	re := make(map[string]interface{})
 
 	for _, item := range nodes {
@@ -331,18 +336,37 @@ func (me *T) GetUserSavingsAmount(contract h160.T, user h160.T, asset h160.T) (*
 		}
 		break
 	}
+	if err != nil || len(re) == 0 {
+		return big.NewInt(0), stderr.ErrFind
+	}
 
-	res := re["result"].(map[string]interface{})
-	state := res["state"]
+	res, ok := re["result"].(map[string]interface{})
+	if !ok {
+		return big.NewInt(0), stderr.ErrFind
+	}
+	state, _ := res["state"].(string)
 	exception := res["exception"]
 
 	if state != "HALT" || exception != nil {
 		return big.NewInt(0), stderr.ErrFind
 	}
 
-	result := res["stack"].([]interface{})[0].(map[string]interface{})["value"]
-	savingAmount, err := strconv.ParseInt(result.(string), 10, 64)
-
+	stack, ok := res["stack"].([]interface{})
+	if !ok || len(stack) == 0 {
+		return big.NewInt(0), stderr.ErrFind
+	}
+	stackTop, ok := stack[0].(map[string]interface{})
+	if !ok {
+		return big.NewInt(0), stderr.ErrFind
+	}
+	result, ok := stackTop["value"].(string)
+	if !ok {
+		return big.NewInt(0), stderr.ErrFind
+	}
+	savingAmount, err := strconv.ParseInt(result, 10, 64)
+	if err != nil {
+		return big.NewInt(0), err
+	}
 	return big.NewInt(savingAmount), nil
 }
 
@@ -360,7 +384,7 @@ func (me *T) GetUserSavingsAmountByRPC(node string, contract string, user string
 
 	jsonData := []byte(para)
 	body := bytes.NewBuffer(jsonData)
-	response, err := http.Post(node, "application/json", body)
+	response, err := httpx.Post(node, "application/json", body)
 	if err != nil {
 		return nil, err
 	}

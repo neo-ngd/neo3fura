@@ -7,6 +7,9 @@ Gets the transfer by the block hash.
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
 | BlockHash      | string| The block hash of the block | Required |
+| Limit    | int|  The number of items to return| Optional|
+| Skip    | int|  The number of items to skip| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -21,6 +24,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
     "params":{"BlockHash":"0xf6ba8db5c013834890903a30a4ce0d65ec5da2addaf4799f15efbedaff42c56f"},
     "method": "GetTransferByBlockHash",
     "id":1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetTransferByBlockHash",
+  "params": {"BlockHash":"0xf6ba8db5c013834890903a30a4ce0d65ec5da2addaf4799f15efbedaff42c56f","Limit":2,"Cursor":"eyJmIjp7...}"},
+  "id": 1
 }'
 ```
 
@@ -44,7 +60,8 @@ Response body
         "value": "50000000"
       }
     ],
-    "totalCount": 1
+    "totalCount": 1,
+    "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

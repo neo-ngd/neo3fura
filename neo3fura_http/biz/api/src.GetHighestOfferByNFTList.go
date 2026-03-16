@@ -17,6 +17,7 @@ import (
 	"neo3fura_http/var/stderr"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -262,6 +263,28 @@ func (me *T) GetHighestOfferByNFTList(args struct {
 
 }
 
+// cachedRpcClients caches RPC clients per endpoint to avoid creating a new connection per call.
+var cachedRpcClients = make(map[string]*rpc.RpcClient)
+var cachedRpcClientsMu sync.RWMutex
+
+func getRpcClient(endpoint string) *rpc.RpcClient {
+	cachedRpcClientsMu.RLock()
+	if c, ok := cachedRpcClients[endpoint]; ok {
+		cachedRpcClientsMu.RUnlock()
+		return c
+	}
+	cachedRpcClientsMu.RUnlock()
+
+	cachedRpcClientsMu.Lock()
+	defer cachedRpcClientsMu.Unlock()
+	if c, ok := cachedRpcClients[endpoint]; ok {
+		return c
+	}
+	c := rpc.NewClient(endpoint)
+	cachedRpcClients[endpoint] = c
+	return c
+}
+
 func GetSavings(scriptHash h160.T, operation string, address []string, assetStr string) ([]*big.Int, error) {
 
 	rt := os.ExpandEnv("${RUNTIME}")
@@ -275,10 +298,11 @@ func GetSavings(scriptHash h160.T, operation string, address []string, assetStr 
 	case "staging":
 		testNetEndPoint = "http://seed2.neo.org:10332"
 	default:
-		log2.Fatalf("runtime environment mismatch")
+		log2.Errorf("runtime environment mismatch: %s", rt)
+		return nil, stderr.ErrUnknown
 	}
 
-	client := rpc.NewClient(testNetEndPoint)
+	client := getRpcClient(testNetEndPoint)
 
 	sb := sc.NewScriptBuilder()
 	sh, err := helper.UInt160FromString(scriptHash.Val())
@@ -287,7 +311,6 @@ func GetSavings(scriptHash h160.T, operation string, address []string, assetStr 
 	}
 
 	for _, item := range address {
-		print(item)
 		user, err := helper.UInt160FromString(item)
 		if err != nil {
 			return nil, err

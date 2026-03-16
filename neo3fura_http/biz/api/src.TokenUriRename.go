@@ -79,7 +79,6 @@ func CopyAndRename(srcFilename string, distFilename string) error {
 	//只读方式打开源文件
 	sF, err1 := os.Open(srcFilename)
 	if err1 != nil {
-		fmt.Println("err1=", err1)
 		return err1
 	}
 	defer sF.Close()
@@ -89,10 +88,9 @@ func CopyAndRename(srcFilename string, distFilename string) error {
 	}
 	wt := bufio.NewWriter(out)
 	defer out.Close()
-	n, err := io.Copy(wt, sF)
-	fmt.Println("copy write", n)
+	_, err = io.Copy(wt, sF)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	wt.Flush()
 	return nil

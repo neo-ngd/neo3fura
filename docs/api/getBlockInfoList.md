@@ -8,6 +8,7 @@ Gets the block information of the recent blocks.
 | ---------- | --- |    ------    | ----|
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -21,6 +22,19 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
   "jsonrpc": "2.0",
   "method": "GetBlockInfoList",
   "params": {"Limit":2},
+  "id": 1
+}'
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetBlockInfoList",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
   "id": 1
 }'
 ```
@@ -49,7 +63,8 @@ Response body
         "transactioncount": 0
       }
     ],
-    "totalCount": 483826
+    "totalCount": 483826,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

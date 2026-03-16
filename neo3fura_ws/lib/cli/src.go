@@ -142,7 +142,7 @@ func (me *T) QueryAggregate(args struct {
 	defer func(cursor *mongo.Cursor, ctx context.Context) {
 		err := cursor.Close(ctx)
 		if err != nil {
-			log2.Fatalf("Closing cursor error %v", err)
+			log2.Errorf("Closing cursor error %v", err)
 		}
 	}(cursor, context.TODO())
 	if err == mongo.ErrNoDocuments {
@@ -196,7 +196,7 @@ func (me *T) GetDistinctCount(args struct {
 	defer func(cursor *mongo.Cursor, ctx context.Context) {
 		err := cursor.Close(ctx)
 		if err != nil {
-			log2.Fatalf("Closing cursor error %v", err)
+			log2.Errorf("Closing cursor error %v", err)
 		}
 	}(cursor, context.TODO())
 

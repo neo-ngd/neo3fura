@@ -23,6 +23,7 @@ func (me *T) GetNFTByAssetClassPrimaryMarket(args struct {
 	ClassName     string
 	Limit         int64
 	Skip          int64
+	Cursor        string
 	Filter        map[string]interface{}
 	Raw           *map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -74,7 +75,7 @@ func (me *T) GetNFTByAssetClassPrimaryMarket(args struct {
 							"else": "$name"}}}}}}}},
 				bson.M{"$match": bson.M{"class": args.ClassName}},
 				bson.M{"$skip": args.Skip},
-				bson.M{"$limit": args.Limit},
+				bson.M{"$limit": args.Limit}, // cursor not applied here due to no stable sort
 			},
 			Query: []string{},
 		}, ret)
@@ -243,7 +244,7 @@ func (me *T) GetNFTByAssetClassPrimaryMarket(args struct {
 		return err
 	}
 	count := len(r2)
-	r3, err := me.FilterAggragateAndAppendCount(r1, count, args.Filter)
+	r3, err := me.FilterAggragateAndAppendCountWithCursor(r1, count, args.Filter, []string{"_id"})
 
 	if err != nil {
 		return err
@@ -430,19 +431,26 @@ func (me *T) GetNFTInfoPrimaryMarket(Market string, Asset string, Tokenid string
 			}
 		}
 
-		//获取Owner 地址的nns信息
-		owner := item["owner"].(string)
-		var nns, userName string
-		if owner != "" {
-			nns, userName, err = GetNNSByAddress(owner)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		item["nns"] = nns
-		item["userName"] = userName
 		delete(item, "eventlist")
+	}
+
+	// Batch fetch NNS data for all owners concurrently
+	ownerAddrs := make([]string, 0, len(r1))
+	for _, item := range r1 {
+		if owner, ok := item["owner"].(string); ok && owner != "" {
+			ownerAddrs = append(ownerAddrs, owner)
+		}
+	}
+	nnsResults := GetNNSByAddresses(ownerAddrs)
+	for _, item := range r1 {
+		owner, _ := item["owner"].(string)
+		if res, ok := nnsResults[owner]; ok && res.Err == nil {
+			item["nns"] = res.NNS
+			item["userName"] = res.UserName
+		} else {
+			item["nns"] = ""
+			item["userName"] = ""
+		}
 	}
 
 	return r1, nil

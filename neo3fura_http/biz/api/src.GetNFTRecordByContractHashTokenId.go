@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"neo3fura_http/lib/type/h160"
@@ -30,23 +29,24 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 	}
 	result := make([]map[string]interface{}, 0)
 
-	r1, _, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "MarketNotification",
-		Index:      "GetNFTRecordByContractHashTokenId",
-		Sort:       bson.M{"timestamp": -1},
-		Filter:     f,
-		Query:      []string{},
+		Collection:   "MarketNotification",
+		Index:        "GetNFTRecordByContractHashTokenId",
+		Sort:         bson.M{"timestamp": -1},
+		Filter:       f,
+		Query:        []string{},
+		CursorFilter: nil,
 	}, ret)
 	if err != nil {
-		fmt.Println("1", err)
 		return err
 	}
 
@@ -62,7 +62,6 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 		Raw          *[]map[string]interface{}
 	}{ContractHash: args.ContractHash, Cursor: "", TokenId: args.TokenId, Raw: &raw2}, ret)
 	if err3 != nil {
-		fmt.Println("2", err)
 		return err3
 	}
 
@@ -71,7 +70,6 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 
 	var raw3 map[string]interface{}
 	err2 := getNFTProperties(strval.T(tokenid), h160.T(asset), me, ret, args.Filter, &raw3)
-	fmt.Println("3", err2)
 	for _, item := range raw2 {
 		tobanlance := item["tobalance"].(primitive.Decimal128).String()
 
@@ -100,7 +98,6 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 					if eventname == "Claim" {
 						bidAmount, err1 := strconv.ParseInt(dat["bidAmount"].(string), 10, 64)
 						if err1 != nil {
-							fmt.Println("4", err)
 							return err1
 						}
 						rr["from"] = item["from"]
@@ -112,7 +109,6 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 					} else if eventname == "CompleteOffer" || eventname == "CompleteOfferCollection" {
 						offerAmount, err1 := strconv.ParseInt(dat["offerAmount"].(string), 10, 64)
 						if err1 != nil {
-							fmt.Println("5", err)
 							return err1
 						}
 						rr["offerAsset"] = dat["offerAsset"]
@@ -123,7 +119,6 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 					}
 
 				} else {
-					fmt.Println("6", err)
 					return err2
 				}
 
@@ -148,55 +143,50 @@ func (me *T) GetNFTRecordByContractHashTokenId(args struct {
 		}
 
 		if tobanlance != "0" {
-			//添加nns
-			fromAddress := ""
-			toAddress := ""
-			if rr["from"] != nil {
-				fromAddress = rr["from"].(string)
-			}
-			if rr["to"] != nil {
-				toAddress = rr["to"].(string)
-			}
-
-			var fromNNS, fromUserName string
-			var toNNS, toUserName string
-			if fromAddress != "" {
-				fromNNS, fromUserName, err = GetNNSByAddress(fromAddress)
-				if err != nil {
-					fmt.Println("7", err)
-					return err
-				}
-			}
-			if toAddress != "" {
-				toNNS, toUserName, err = GetNNSByAddress(toAddress)
-				if err != nil {
-					fmt.Println("8", err)
-					return err
-				}
-			}
-			rr["from_nns"] = fromNNS
-			rr["to_nns"] = toNNS
-			rr["from_userName"] = fromUserName
-			rr["to_userName"] = toUserName
 			result = append(result, rr)
 		}
-		//result = append(result, rr)
+	}
 
+	// Batch fetch NNS data for all from/to addresses concurrently
+	allAddrs := make([]string, 0, len(result)*2)
+	for _, rr := range result {
+		if from, ok := rr["from"].(string); ok && from != "" {
+			allAddrs = append(allAddrs, from)
+		}
+		if to, ok := rr["to"].(string); ok && to != "" {
+			allAddrs = append(allAddrs, to)
+		}
+	}
+	nnsResults := GetNNSByAddresses(allAddrs)
+	for _, rr := range result {
+		fromAddr, _ := rr["from"].(string)
+		toAddr, _ := rr["to"].(string)
+		if res, ok := nnsResults[fromAddr]; ok && res.Err == nil {
+			rr["from_nns"] = res.NNS
+			rr["from_userName"] = res.UserName
+		} else {
+			rr["from_nns"] = ""
+			rr["from_userName"] = ""
+		}
+		if res, ok := nnsResults[toAddr]; ok && res.Err == nil {
+			rr["to_nns"] = res.NNS
+			rr["to_userName"] = res.UserName
+		} else {
+			rr["to_nns"] = ""
+			rr["to_userName"] = ""
+		}
 	}
 
 	num, err := strconv.ParseInt(strconv.Itoa(len(result)), 10, 64)
 	if err != nil {
-		fmt.Println("num", err)
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(result, num, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(result, num, args.Filter, []string{"_id"})
 	if err != nil {
-		fmt.Println("r2", err)
 		return err
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {
-		fmt.Println("r", err)
 		return err
 	}
 

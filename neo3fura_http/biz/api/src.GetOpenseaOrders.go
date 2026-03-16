@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"neo3fura_http/lib/httpx"
 	"neo3fura_http/lib/type/h160"
 	"net/http"
 	"strconv"
@@ -78,7 +79,7 @@ func (me *T) GetOpenseaOrders(args struct {
 		params = params + tokenids
 	}
 	if args.Side != "" {
-		params = params + "side=" + fmt.Sprintf("%d", args.Side) + "&"
+		params = params + "side=" + args.Side + "&"
 	} else {
 		params = params + "side=1&"
 	}
@@ -107,18 +108,17 @@ func (me *T) GetOpenseaOrders(args struct {
 	var requestGetURLNoParams = "https://api.opensea.io/wyvern/v1/orders?" + params
 	//fmt.Println(requestGetURLNoParams1)
 	//consts requestGetURLNoParams = "https://api.opensea.io/wyvern/v1/orders?bundled=false&include_bundled=false&side=1&limit=20&offset=0&order_by=created_date&order_direction=desc"
-	client := &http.Client{}
 	req, err := http.NewRequest("GET", requestGetURLNoParams, nil)
 	if err != nil {
-		panic(err)
 		return err
 	}
 	req.Header.Add("Accept", "application/json")
 	req.Header.Set("X-API-KEY", args.ApiKey)
-	resp, err := client.Do(req)
+	resp, err := httpx.Do(req)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
 	resbody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

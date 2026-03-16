@@ -1,7 +1,6 @@
 package log
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -59,15 +58,6 @@ const (
 	ErrorCasePath        = "./Logs/ErrorCase/"
 )
 
-func GetGID() uint64 {
-	var buf [64]byte
-	b := buf[:runtime.Stack(buf[:], false)]
-	b = bytes.TrimPrefix(b, []byte("goroutine "))
-	b = b[:bytes.IndexByte(b, ' ')]
-	n, _ := strconv.ParseUint(string(b), 10, 64)
-	return n
-}
-
 var Log *Logger
 
 func init() {
@@ -120,12 +110,7 @@ func (l *Logger) SetDebugLevel(level int) error {
 
 func (l *Logger) Output(level int, a ...interface{}) error {
 	if level >= l.level {
-		gid := GetGID()
-		gidStr := strconv.FormatUint(gid, 10)
-
-		a = append([]interface{}{LevelName(level), "GID",
-			gidStr + ","}, a...)
-
+		a = append([]interface{}{LevelName(level)}, a...)
 		return l.logger.Output(CALL_DEPTH, fmt.Sprintln(a...))
 	}
 	return nil
@@ -133,11 +118,8 @@ func (l *Logger) Output(level int, a ...interface{}) error {
 
 func (l *Logger) Outputf(level int, format string, v ...interface{}) error {
 	if level >= l.level {
-		gid := GetGID()
-		v = append([]interface{}{LevelName(level), "GID",
-			gid}, v...)
-
-		return l.logger.Output(CALL_DEPTH, fmt.Sprintf("%s %s %d, "+format+"\n", v...))
+		v = append([]interface{}{LevelName(level)}, v...)
+		return l.logger.Output(CALL_DEPTH, fmt.Sprintf("%s "+format+"\n", v...))
 	}
 	return nil
 }
@@ -184,10 +166,12 @@ func (l *Logger) Errorf(format string, a ...interface{}) {
 
 func (l *Logger) Fatal(a ...interface{}) {
 	l.Output(FatalLog, a...)
+	os.Exit(1)
 }
 
 func (l *Logger) Fatalf(format string, a ...interface{}) {
 	l.Outputf(FatalLog, format, a...)
+	os.Exit(1)
 }
 
 func Trace(a ...interface{}) {

@@ -9,6 +9,7 @@ Gets the Nep11 transfer information by the block height
 | BlockHeight    | int| The block height | Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
+| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
 
 
 ### Example
@@ -22,6 +23,19 @@ Request body
     "params": {"BlockHeight":69981},
     "id": 1
 }
+```
+
+Request body (with cursor)
+
+```powershell
+curl --location --request POST 'https://testneofura.ngd.network:444' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "jsonrpc": "2.0",
+  "method": "GetNep11TransferByBlockHeight",
+  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
+  "id": 1
+}'
 ```
 
 Response body
@@ -45,7 +59,8 @@ Response body
         "value": "1"
       }
     ],
-    "totalCount": 1
+    "totalCount": 1,
+        "nextCursor": "eyJmIjp7...}}"
   },
   "error": null
 }

@@ -38,36 +38,37 @@ func (me *T) GetNep11TransferByContractHashTokenId(args struct {
 	} else {
 		f = bson.M{"contract": args.ContractHash.Val(), "tokenId": args.TokenId}
 	}
+
+	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
+
+	var cursorFilter bson.M
 	if args.Cursor != "" {
-		cursorFilter, err := buildOIDDescCursorFilter(args.Cursor)
+		cursorValues, err := DecodeCursor(args.Cursor)
 		if err != nil {
 			return err
 		}
-		f = bson.M{
-			"$and": []interface{}{
-				f,
-				cursorFilter,
-			},
-		}
-		args.Skip = 0
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
 	}
-	queryLimit := args.Limit + 1
-	r1, count, err := me.Client.QueryAll(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+
+	r1, count, err := me.Client.QueryAllWithCursor(struct {
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
+		CursorFilter bson.M
 	}{
-		Collection: "Nep11TransferNotification",
-		Index:      "GetNep11TransferByAddress",
-		Sort:       bson.M{"_id": -1},
-		Filter:     f,
-		Query:      []string{},
-		Limit:      queryLimit,
-		Skip:       args.Skip,
+		Collection:   "Nep11TransferNotification",
+		Index:        "GetNep11TransferByAddress",
+		Sort:         bson.M{"_id": -1},
+		Filter:       f,
+		Query:        []string{},
+		Limit:        args.Limit,
+		Skip:         args.Skip,
+		CursorFilter: cursorFilter,
 	}, ret)
 	hasNext := int64(len(r1)) > args.Limit
 	page := r1
@@ -81,7 +82,7 @@ func (me *T) GetNep11TransferByContractHashTokenId(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}
