@@ -18,7 +18,6 @@ func (me *T) GetNep17TransferByAddress(args struct {
 	Cursor              string
 	Start               int64
 	End                 int64
-	Cursor              string
 	Filter              map[string]interface{}
 	ExcludeBonusAndBurn bool
 	Raw                 *[]map[string]interface{}
@@ -140,7 +139,7 @@ func (me *T) GetNep17TransferByAddress(args struct {
 	}
 
 	if args.Limit != 0 {
-		pipeline = append(pipeline, bson.M{"$limit": args.Limit})
+		pipeline = append(pipeline, bson.M{"$limit": queryLimit})
 	}
 
 	pipeline = append(pipeline,

@@ -31,6 +31,7 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 	if args.Skip < 0 {
 		args.Skip = 0
 	}
+	sortKeys := []string{"_id"}
 	filter := bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}}
 	if args.Cursor != "" {
 		cursorFilter, err := buildOIDDescCursorFilter(args.Cursor)

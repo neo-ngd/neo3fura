@@ -24,13 +24,7 @@ func (me *T) GetAddressList(args struct {
 	if args.Skip < 0 {
 		args.Skip = 0
 	}
-	cursorFilter := bson.M{}
 	if args.Cursor != "" {
-		decodedFilter, err := buildIntDescCursorFilter("firstusetime", args.Cursor)
-		if err != nil {
-			return err
-		}
-		cursorFilter = decodedFilter
 		args.Skip = 0
 	}
 	queryLimit := args.Limit + 1
@@ -55,7 +49,7 @@ func (me *T) GetAddressList(args struct {
 	}
 
 	pipeline = append(pipeline,
-		bson.M{"$limit": args.Limit},
+		bson.M{"$limit": queryLimit},
 		bson.M{"$lookup": bson.M{
 			"from": "Address-Asset",
 			"let":  bson.M{"address": "$address"},
@@ -178,7 +172,7 @@ func (me *T) GetAddressList(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCount(r1, count["total counts"].(int64), args.Filter,sortKeys)
+	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count["total counts"].(int64), args.Filter, sortKeys)
 	if err != nil {
 		return err
 	}

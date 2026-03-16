@@ -24,7 +24,35 @@ func (me *T) GetTransferByAddress(args struct {
 	if args.Limit <= 0 {
 		args.Limit = consts.DefaultLimit
 	}
-	r1, _, err1 := me.Client.QueryAllWithCursor(struct {
+	if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
+	if args.Skip < 0 {
+		args.Skip = 0
+	}
+
+	baseFilter := bson.M{"$or": []interface{}{
+		bson.M{"from": args.Address.TransferredVal()},
+		bson.M{"to": args.Address.TransferredVal()},
+	}}
+	queryLimit := args.Limit + 1
+	fetchLimit := args.Skip + queryLimit
+	if fetchLimit > consts.MaxLimit {
+		fetchLimit = consts.MaxLimit
+	}
+
+	var cursorFilter bson.M
+	if args.Cursor != "" {
+		decodedFilter, err := buildIntDescCursorFilter("timestamp", args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = decodedFilter
+		args.Skip = 0
+		fetchLimit = queryLimit
+	}
+
+	r1, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection   string
 		Index        string
 		Sort         bson.M
@@ -34,21 +62,20 @@ func (me *T) GetTransferByAddress(args struct {
 		Skip         int64
 		CursorFilter bson.M
 	}{
-		Collection: "Nep11TransferNotification",
-		Index:      "GetTransferByAddress",
-		Sort:       bson.M{},
-		Filter: bson.M{"$or": []interface{}{
-			bson.M{"from": args.Address.TransferredVal()},
-			bson.M{"to": args.Address.TransferredVal()},
-		}},
+		Collection:   "Nep11TransferNotification",
+		Index:        "GetTransferByAddress",
+		Sort:         bson.M{"timestamp": -1, "_id": -1},
+		Filter:       baseFilter,
 		Query:        []string{},
-		CursorFilter: nil,
+		Limit:        fetchLimit,
+		Skip:         0,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err != nil {
 		return err
 	}
 
-	r2, _, err2 := me.Client.QueryAllWithCursor(struct {
+	r2, _, err := me.Client.QueryAllWithCursor(struct {
 		Collection   string
 		Index        string
 		Sort         bson.M
@@ -58,15 +85,14 @@ func (me *T) GetTransferByAddress(args struct {
 		Skip         int64
 		CursorFilter bson.M
 	}{
-		Collection: "TransferNotification",
-		Index:      "GetTransferByAddress",
-		Sort:       bson.M{},
-		Filter: bson.M{"$or": []interface{}{
-			bson.M{"from": args.Address.TransferredVal()},
-			bson.M{"to": args.Address.TransferredVal()},
-		}},
+		Collection:   "TransferNotification",
+		Index:        "GetTransferByAddress",
+		Sort:         bson.M{"timestamp": -1, "_id": -1},
+		Filter:       baseFilter,
 		Query:        []string{},
-		CursorFilter: nil,
+		Limit:        fetchLimit,
+		Skip:         0,
+		CursorFilter: cursorFilter,
 	}, ret)
 	if err != nil {
 		return err
@@ -132,9 +158,8 @@ func (me *T) GetTransferByAddress(args struct {
 		return err
 	}
 
-	sortKeys := []string{"_id"}
-
-	r5, err := me.FilterArrayAndAppendCountWithCursor(r4, int64(len(r3)), args.Filter, sortKeys)
+	totalCount := nep11CountRow["total counts"].(int64) + nep17CountRow["total counts"].(int64)
+	r5, err := me.FilterArrayAndAppendCount(page, totalCount, args.Filter)
 	if err != nil {
 		return err
 	}

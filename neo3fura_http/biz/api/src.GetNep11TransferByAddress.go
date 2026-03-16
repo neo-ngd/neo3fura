@@ -18,7 +18,6 @@ func (me *T) GetNep11TransferByAddress(args struct {
 	Cursor  string
 	Start   int64
 	End     int64
-	Cursor  string
 	Filter  map[string]interface{}
 	Raw     *[]map[string]interface{}
 }, ret *json.RawMessage) error {
@@ -91,7 +90,7 @@ func (me *T) GetNep11TransferByAddress(args struct {
 	}
 
 	pipeline = append(pipeline,
-		bson.M{"$limit": args.Limit},
+		bson.M{"$limit": queryLimit},
 		bson.M{"$lookup": bson.M{
 			"from": "Execution",
 			"let":  bson.M{"txid": "$txid", "blockhash": "$blockhash"},
