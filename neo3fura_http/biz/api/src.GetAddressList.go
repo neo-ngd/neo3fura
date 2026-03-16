@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"neo3fura_http/lib/type/consts"
+	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -15,8 +16,24 @@ func (me *T) GetAddressList(args struct {
 	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
 	if args.Limit <= 0 {
-		args.Limit = 20
+		args.Limit = consts.DefaultLimit
 	}
+	if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
+	if args.Skip < 0 {
+		args.Skip = 0
+	}
+	cursorFilter := bson.M{}
+	if args.Cursor != "" {
+		decodedFilter, err := buildIntDescCursorFilter("firstusetime", args.Cursor)
+		if err != nil {
+			return err
+		}
+		cursorFilter = decodedFilter
+		args.Skip = 0
+	}
+	queryLimit := args.Limit + 1
 
 	sortKeys := []string{"firstusetime"}
 	sortDirs := map[string]int{"firstusetime": -1}
@@ -99,14 +116,20 @@ func (me *T) GetAddressList(args struct {
 		Index:      "GetAddressInfo",
 		Sort:       bson.M{},
 		Filter:     bson.M{},
-		Pipeline:   pipeline,
-		Query:      []string{},
+		Pipeline: pipeline,
+		Query: []string{},
 	}, ret)
 	if err != nil {
 		return err
 	}
 
-	for _, item := range r1 {
+	hasNext := int64(len(r1)) > args.Limit
+	page := r1
+	if hasNext {
+		page = r1[:args.Limit]
+	}
+
+	for _, item := range page {
 		nep17balance := item["nep17balance"].(primitive.A)
 		nep17transfer := item["nep17transfer"].(primitive.A)
 		nep11transfer := item["nep11transfer"].(primitive.A)
@@ -155,9 +178,25 @@ func (me *T) GetAddressList(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count["total counts"].(int64), args.Filter, sortKeys)
+	r2, err := me.FilterArrayAndAppendCount(r1, count["total counts"].(int64), args.Filter,sortKeys)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		sortValue, ok := int64FromAny(last["firstusetime"])
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeIntDescCursor(sortValue, oid)
+		if err != nil {
+			return err
+		}
+		r2["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {

@@ -26,8 +26,11 @@ func (me *T) GetAddressByAddress(args struct {
 		Collection: "Address",
 		Index:      "GetAddressByAddress",
 		Sort:       bson.M{},
-		Filter:     bson.M{"address": args.Address.TransferredVal()},
-		Query:      []string{"_id", "address", "firstusetime"},
+		Filter: bson.M{"address": bson.M{"$in": []string{
+			args.Address.TransferredVal(),
+			args.Address.TransferAddress(),
+		}}},
+		Query: []string{"_id", "address", "firstusetime"},
 	}, ret)
 
 	if err != nil {

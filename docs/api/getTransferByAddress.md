@@ -9,7 +9,7 @@ Gets the transfer by the user's address
 | Address    | string|  The user's address| Required |
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
-| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
+| Cursor  | string| Cursor-based pagination token. When provided, `Skip` is ignored.| Optional |
 
 
 ### Example
@@ -35,7 +35,7 @@ curl --location --request POST 'https://testneofura.ngd.network:444' \
 --data-raw '{
   "jsonrpc": "2.0",
   "method": "GetTransferByAddress",
-  "params": {"Limit":2,"Cursor":"eyJmIjp7...}"},
+  "params": {"Limit":50,"Address":"0xb31b1ef4b504f5413dbed7e6e58fd11dedb6f4ab","Cursor":"<nextCursor from previous page>"},
   "id": 1
 }'
 ```

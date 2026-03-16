@@ -2,11 +2,7 @@
 get nft record by user's address
 <hr>
 
-### Request
-
-> POST https://testneofura.ngd.network:444
-
-#### Body Parameters
+### Parameters
 
 | Name            | Type   | Description                   | Required |
 | --------------- | ------ | ----------------------------- | -------- |
@@ -18,7 +14,7 @@ get nft record by user's address
 | Cursor          | string | Cursor for keyset pagination (from previous response's nextCursor) | optional |
 
 
-#### Example
+### Example
 ```
 curl --location --request GET 'https://testneofura.ngd.network:444' \
 --header 'Content-Type: application/json' \

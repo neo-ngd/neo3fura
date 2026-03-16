@@ -3,11 +3,13 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/h256"
 	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -56,8 +58,13 @@ func (me *T) GetRawTransactionByAddress(args struct {
 	if err != nil {
 		return err
 	}
+	hasNext := int64(len(r1)) > args.Limit
+	page := r1
+	if hasNext {
+		page = r1[:args.Limit]
+	}
 	var raw1 map[string]interface{}
-	for _, item := range r1 {
+	for _, item := range page {
 		err = me.GetVmStateByTransactionHash(struct {
 			TransactionHash h256.T
 			Filter          map[string]interface{}
@@ -91,6 +98,18 @@ func (me *T) GetRawTransactionByAddress(args struct {
 	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeOIDCursor(oid)
+		if err != nil {
+			return err
+		}
+		r2["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {

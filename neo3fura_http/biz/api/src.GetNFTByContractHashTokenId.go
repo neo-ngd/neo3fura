@@ -37,7 +37,7 @@ func (me *T) GetNFTByContractHashTokenId(args struct {
 			Cursor       string
 			Filter       map[string]interface{}
 			Raw          *[]map[string]interface{}
-		}{ContractHash: args.ContractHash, Raw: &raw1}, ret)
+		}{ContractHash: args.ContractHash, Cursor: "", Raw: &raw1}, ret)
 		if err != nil {
 			return err
 		}

@@ -2,8 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"neo3fura_http/lib/type/consts"
+	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (me *T) GetTransactionList(args struct {
@@ -12,8 +15,8 @@ func (me *T) GetTransactionList(args struct {
 	Cursor string
 	Filter map[string]interface{}
 }, ret *json.RawMessage) error {
-	if args.Limit == 0 {
-		args.Limit = 512
+	if args.Limit <= 0 {
+		args.Limit = consts.DefaultLimit
 	}
 
 	sortKeys := []string{"blocktime"}
@@ -53,6 +56,18 @@ func (me *T) GetTransactionList(args struct {
 	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeOIDCursor(oid)
+		if err != nil {
+			return err
+		}
+		r2["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {

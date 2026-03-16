@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // this function may be not supported any more, we only support address in the formart of script hash
@@ -57,6 +59,18 @@ func (me *T) GetScCallByContractHash(args struct {
 	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeOIDCursor(oid)
+		if err != nil {
+			return err
+		}
+		r2["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {

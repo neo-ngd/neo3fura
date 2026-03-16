@@ -5,9 +5,12 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+
 	"sort"
 	"strings"
+
 
 	"github.com/go-redis/redis/v8"
 	"github.com/joeqian10/neo3-gogogo/rpc"
@@ -47,6 +50,7 @@ type SourceCode struct {
 	Code          string
 }
 
+
 func sortedBsonKeys(m bson.M) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -54,6 +58,109 @@ func sortedBsonKeys(m bson.M) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func normalizeLimit(limit int64) int64 {
+	defaultLimit := configuredInt64Env("NEO3FURA_DEFAULT_LIMIT", consts.DefaultLimit)
+	maxLimit := configuredInt64Env("NEO3FURA_MAX_LIMIT", consts.MaxLimit)
+	if maxLimit < 1 {
+		maxLimit = consts.MaxLimit
+	}
+	if defaultLimit < 1 {
+		defaultLimit = consts.DefaultLimit
+	}
+	if defaultLimit > maxLimit {
+		defaultLimit = maxLimit
+	}
+	if limit <= 0 {
+		return defaultLimit
+	}
+	if limit > maxLimit {
+		return maxLimit
+	}
+	return limit
+}
+
+func normalizeSkip(skip int64) int64 {
+	if skip < 0 {
+		return 0
+	}
+	return skip
+}
+
+func asInt64(v interface{}) (int64, bool) {
+	switch t := v.(type) {
+	case int:
+		return int64(t), true
+	case int8:
+		return int64(t), true
+	case int16:
+		return int64(t), true
+	case int32:
+		return int64(t), true
+	case int64:
+		return t, true
+	case uint:
+		return int64(t), true
+	case uint8:
+		return int64(t), true
+	case uint16:
+		return int64(t), true
+	case uint32:
+		return int64(t), true
+	case uint64:
+		if t > uint64(9223372036854775807) {
+			return 0, false
+		}
+		return int64(t), true
+	case float32:
+		return int64(t), true
+	case float64:
+		return int64(t), true
+	case string:
+		n, err := strconv.ParseInt(t, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	default:
+		return 0, false
+	}
+}
+
+func normalizePipelineLimit(pipeline []bson.M) {
+	for _, stage := range pipeline {
+		rawLimit, ok := stage["$limit"]
+		if !ok {
+			continue
+		}
+		limit, ok := asInt64(rawLimit)
+		if !ok {
+			continue
+		}
+		stage["$limit"] = normalizeLimit(limit)
+	}
+}
+
+func configuredInt64Env(key string, fallback int64) int64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return fallback
+	}
+	return v
+}
+
+func queryTimeoutDuration() time.Duration {
+	ms := configuredInt64Env("NEO3FURA_QUERY_TIMEOUT_MS", 15000)
+	if ms <= 0 {
+		ms = 15000
+	}
+	return time.Duration(ms) * time.Millisecond
+
 }
 
 func (me *T) GetCollection(args struct {
@@ -97,7 +204,7 @@ func (me *T) QueryOne(args struct {
 		collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
 		opts := options.FindOne().SetSort(args.Sort)
 		err = collection.FindOne(me.Ctx, args.Filter, opts).Decode(&result)
-		if err == mongo.ErrNoDocuments {
+		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, stderr.ErrNotFound
 		} else if err != nil {
 			return nil, stderr.ErrFind
@@ -147,38 +254,53 @@ func (me *T) QueryAll(args struct {
 	Limit      int64
 	Skip       int64
 }, ret *json.RawMessage) ([]map[string]interface{}, int64, error) {
-
-	if args.Limit == 0 {
-		args.Limit = consts.DefaultLimit
-	} else if args.Limit > consts.MaxLimit {
-		args.Limit = consts.MaxLimit
-	}
+	args.Limit = normalizeLimit(args.Limit)
+	args.Skip = normalizeSkip(args.Skip)
 
 	var results []map[string]interface{}
 	convert := make([]map[string]interface{}, 0)
 	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
+	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
+	defer cancel()
 	op := options.Find()
 	op.SetSort(args.Sort)
 	op.SetLimit(args.Limit)
 	op.SetSkip(args.Skip)
-	co := options.CountOptions{}
-	count, err := collection.CountDocuments(me.Ctx, args.Filter, &co)
+	var (
+		count int64
+		err   error
+	)
+	if len(args.Filter) == 0 {
+		count, err = collection.EstimatedDocumentCount(queryCtx)
+	} else {
+		co := options.CountOptions{}
+		count, err = collection.CountDocuments(queryCtx, args.Filter, &co)
+	}
+	if err != nil && err != context.DeadlineExceeded {
+		log2.Warnf("count fallback to CountDocuments for %s due to err=%v", args.Collection, err)
+		co := options.CountOptions{}
+		count, err = collection.CountDocuments(queryCtx, args.Filter, &co)
+	}
 	if err != nil {
 		return nil, 0, stderr.ErrFind
 	}
+
 	cursor, err := collection.Find(me.Ctx, args.Filter, op)
 	if err == mongo.ErrNoDocuments {
+
 		return nil, 0, stderr.ErrNotFound
 	}
 	if err != nil {
 		return nil, 0, stderr.ErrFind
 	}
 	defer func() {
+
 		if err := cursor.Close(me.Ctx); err != nil {
 			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
 	if err = cursor.All(me.Ctx, &results); err != nil {
+
 		return nil, 0, stderr.ErrFind
 	}
 	for _, item := range results {
@@ -390,6 +512,10 @@ func (me *T) QueryLastJobs(args struct {
 }) ([]map[string]interface{}, error) {
 	collection := me.C_local.Database("job").Collection(args.Collection)
 	var results []map[string]interface{}
+	args.Limit = normalizeLimit(args.Limit)
+	args.Skip = normalizeSkip(args.Skip)
+	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
+	defer cancel()
 	//
 	op := options.Find()
 	op.SetSort(args.Sort)
@@ -421,21 +547,13 @@ func (me *T) QueryAggregate(args struct {
 	Pipeline   []bson.M
 	Query      []string
 }, ret *json.RawMessage) ([]map[string]interface{}, error) {
-	for _, v := range args.Pipeline {
-		limit := v["$limit"]
-		if limit != nil {
-			if limit.(int64) == 0 {
-				//	v["$limit"] = consts.DefaultLimit
-			}
-			if limit.(int64) > consts.MaxLimit {
-				v["$limit"] = consts.MaxLimit
-			}
-		}
-	}
+	normalizePipelineLimit(args.Pipeline)
 
 	var results []map[string]interface{}
 	convert := make([]map[string]interface{}, 0)
 	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
+	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
+	defer cancel()
 	op := options.AggregateOptions{}
 	op.SetAllowDiskUse(true)
 
@@ -487,6 +605,9 @@ func (me *T) QueryAggregateJob(args struct {
 	var results []map[string]interface{}
 	convert := make([]map[string]interface{}, 0)
 	collection := me.C_local.Database("job").Collection(args.Collection)
+	normalizePipelineLimit(args.Pipeline)
+	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
+	defer cancel()
 	op := options.AggregateOptions{}
 
 	cursor, err := collection.Aggregate(me.Ctx, args.Pipeline, &op)
@@ -531,11 +652,24 @@ func (me *T) QueryDocument(args struct {
 	Sort       bson.M
 	Filter     bson.M
 }, ret *json.RawMessage) (map[string]interface{}, error) {
-	co := options.CountOptions{}
 	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
-	count, err := collection.CountDocuments(me.Ctx, args.Filter, &co)
+	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
+	defer cancel()
+	var (
+		count int64
+		err   error
+	)
+	if len(args.Filter) == 0 {
+		count, err = collection.EstimatedDocumentCount(queryCtx)
+	} else {
+		co := options.CountOptions{}
+		count, err = collection.CountDocuments(queryCtx, args.Filter, &co)
+	}
 	if err == mongo.ErrNoDocuments {
 		return nil, stderr.ErrNotFound
+	}
+	if err != nil {
+		return nil, stderr.ErrFind
 	}
 	convert := make(map[string]interface{})
 	convert["total counts"] = count

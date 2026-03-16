@@ -2,10 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
+	"sort"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (me *T) GetTransferByAddress(args struct {
@@ -18,8 +21,8 @@ func (me *T) GetTransferByAddress(args struct {
 	if args.Address.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-	if args.Limit == 0 {
-		args.Limit = 512
+	if args.Limit <= 0 {
+		args.Limit = consts.DefaultLimit
 	}
 	r1, _, err1 := me.Client.QueryAllWithCursor(struct {
 		Collection   string
@@ -32,7 +35,7 @@ func (me *T) GetTransferByAddress(args struct {
 		CursorFilter bson.M
 	}{
 		Collection: "Nep11TransferNotification",
-		Index:      "GetNep11TransferByAddress",
+		Index:      "GetTransferByAddress",
 		Sort:       bson.M{},
 		Filter: bson.M{"$or": []interface{}{
 			bson.M{"from": args.Address.TransferredVal()},
@@ -41,8 +44,8 @@ func (me *T) GetTransferByAddress(args struct {
 		Query:        []string{},
 		CursorFilter: nil,
 	}, ret)
-	if err1 != nil {
-		return err1
+	if err != nil {
+		return err
 	}
 
 	r2, _, err2 := me.Client.QueryAllWithCursor(struct {
@@ -56,7 +59,7 @@ func (me *T) GetTransferByAddress(args struct {
 		CursorFilter bson.M
 	}{
 		Collection: "TransferNotification",
-		Index:      "GetNep17TransferByAddress",
+		Index:      "GetTransferByAddress",
 		Sort:       bson.M{},
 		Filter: bson.M{"$or": []interface{}{
 			bson.M{"from": args.Address.TransferredVal()},
@@ -65,20 +68,68 @@ func (me *T) GetTransferByAddress(args struct {
 		Query:        []string{},
 		CursorFilter: nil,
 	}, ret)
-
-	if err2 != nil {
-		return err2
+	if err != nil {
+		return err
 	}
-	r3 := append(r1, r2...)
-	r4 := make([]map[string]interface{}, 0)
-	for i, item := range r3 {
-		if int64(i) < args.Skip {
-			continue
-		} else if int64(i) > args.Skip+args.Limit-1 {
-			continue
-		} else {
-			r4 = append(r4, item)
+
+	merged := append(r1, r2...)
+	sort.Slice(merged, func(i, j int) bool {
+		ti, _ := int64FromAny(merged[i]["timestamp"])
+		tj, _ := int64FromAny(merged[j]["timestamp"])
+		if ti != tj {
+			return ti > tj
 		}
+		oi, ok1 := merged[i]["_id"].(primitive.ObjectID)
+		oj, ok2 := merged[j]["_id"].(primitive.ObjectID)
+		if ok1 && ok2 {
+			return oi.Hex() > oj.Hex()
+		}
+		return false
+	})
+
+	start := args.Skip
+	if start > int64(len(merged)) {
+		start = int64(len(merged))
+	}
+	end := start + queryLimit
+	if end > int64(len(merged)) {
+		end = int64(len(merged))
+	}
+	window := merged[start:end]
+
+	hasNext := int64(len(window)) > args.Limit
+	page := window
+	if hasNext {
+		page = window[:args.Limit]
+	}
+
+	nep11CountRow, err := me.Client.QueryDocument(struct {
+		Collection string
+		Index      string
+		Sort       bson.M
+		Filter     bson.M
+	}{
+		Collection: "Nep11TransferNotification",
+		Index:      "GetTransferByAddressCount",
+		Sort:       bson.M{},
+		Filter:     baseFilter,
+	}, ret)
+	if err != nil {
+		return err
+	}
+	nep17CountRow, err := me.Client.QueryDocument(struct {
+		Collection string
+		Index      string
+		Sort       bson.M
+		Filter     bson.M
+	}{
+		Collection: "TransferNotification",
+		Index:      "GetTransferByAddressCount",
+		Sort:       bson.M{},
+		Filter:     baseFilter,
+	}, ret)
+	if err != nil {
+		return err
 	}
 
 	sortKeys := []string{"_id"}
@@ -86,6 +137,22 @@ func (me *T) GetTransferByAddress(args struct {
 	r5, err := me.FilterArrayAndAppendCountWithCursor(r4, int64(len(r3)), args.Filter, sortKeys)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		sortValue, ok := int64FromAny(last["timestamp"])
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeIntDescCursor(sortValue, oid)
+		if err != nil {
+			return err
+		}
+		r5["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r5)
 	if err != nil {

@@ -2,13 +2,15 @@
 Gets the transaction list.
 <hr>
 
+> Pagination recommendation: new clients should use `Cursor` first. `Skip` is for backward compatibility only.
+
 ### Parameters
 
 |    Name    | Type | Description | Required |
 | ---------- | --- |    ------    | ----|
 | Limit    | int|  The number of items to return| Optional|
 | Skip    | int|  The number of items to return| Optional |
-| Cursor | string| Cursor for keyset pagination (from previous response's nextCursor)| Optional|
+| Cursor  | string| Cursor-based pagination token. When provided, `Skip` is ignored.| Optional |
 
 
 ### Example

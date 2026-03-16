@@ -1,0 +1,84 @@
+# Interface Parameter Audit
+
+- Date: 2026-03-10
+- Total methods in config: 162
+- Missing parameter docs: 58
+- Docs with `Parameters: None`: 12
+- Docs parameter table parse issue: 1
+
+## Missing Docs Methods
+- `GetApplicationLogsByTransactionHash`
+- `GetAssetInfoByTokenName`
+- `GetHoldersByContractHash`
+- `GetNep11BalanceByContractHashAddress`
+- `GetTotalSentAndReceivedByContractHashAddress`
+- `getblock`
+- `getblockhash`
+- `getblockheader`
+- `getrawtransaction`
+- `GetNFTByContractHashTokenId`
+- `GetNeoFsImage`
+- `InsertVerifiedContract`
+- `GetNNSNameByOwner`
+- `GetBalanceOfByAddress`
+- `GetOpenseaSingleContract`
+- `GetOpenseaSingleCollection`
+- `GetOpenseaOrders`
+- `GetEventByContractHash`
+- `GetVoteRecordByProjectId`
+- `GetVoteRecordByProjectIdList`
+- `GetOffersByNFT`
+- `GetOffersByAddress`
+- `GetVoteRecord`
+- `GetHighestOfferByNFT`
+- `GetHighestOfferByNFTList`
+- `InsertContractSourceCode`
+- `GetNFTActivityByAsset`
+- `GetMarketDailyVolume`
+- `GetMarketDayVolumeByAsset`
+- `GetMarketFloorPriceByAsset`
+- `GetMarketCheapOrdersByAsset`
+- `GetMarketOrdersByPrice`
+- `GetUserInfoTwitter`
+- `GetCompareVerify`
+- `InsertContractSourceCodefromBak`
+- `SetPopularTokenWhitelist`
+- `TokenUriRename`
+- `GetMarketCollections`
+- `SetMarketCollectionWhitelist`
+- `GetInfoByNFT`
+- `GetMarketAssetOwnedByAddress`
+- `GetNFTList`
+- `GetNFTByAssetClass`
+- `GetCollectionsByAsset`
+- `GetCountNFTList`
+- `GetInfoByNFTList`
+- `SetPrimaryMarketPreSaleWhitelist`
+- `GetPrimaryMarketPreSaleWhitelist`
+- `ScanNFTLatestTransaction`
+- `GetNFTByAssetClassPrimaryMarket`
+- `GetInfoByNFTPrimaryMarket`
+- `GetMarketCollectionWhitelist`
+- `GetRedEnvelopeUsers`
+- `GetBridgeTxByNonce`
+- `GetWithdrawalCount`
+- `GetBridgeDepositHistory`
+- `GetTransferTxByAddressAsset`
+- `GetTransferTxByAddressAssetCount`
+
+## Methods With No Params (From Docs)
+- `GetAddressCount`
+- `GetAssetCount`
+- `GetBestBlockHash`
+- `GetBlockCount`
+- `GetCandidateCount`
+- `GetContractCount`
+- `GetCumulativeFeeBurn`
+- `GetNetFeeRange`
+- `GetRawMemPool`
+- `GetTotalVotes`
+- `GetTransactionCount`
+- `getblockcount`
+
+## Docs Parse Issues
+- `GetNFTRecordByAddress`

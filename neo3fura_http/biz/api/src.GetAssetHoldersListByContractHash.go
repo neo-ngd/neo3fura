@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"math/big"
+	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
 
@@ -21,38 +22,55 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 	if args.ContractHash.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
-
-	sortKeys := []string{"_id"}
-	sortDirs := map[string]int{"_id": -1}
-
-	var cursorFilter bson.M
+	if args.Limit <= 0 {
+		args.Limit = consts.DefaultLimit
+	}
+	if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
+	if args.Skip < 0 {
+		args.Skip = 0
+	}
+	filter := bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}}
 	if args.Cursor != "" {
-		cursorValues, err := DecodeCursor(args.Cursor)
+		cursorFilter, err := buildOIDDescCursorFilter(args.Cursor)
 		if err != nil {
 			return err
 		}
-		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+		filter = bson.M{
+			"$and": []interface{}{
+				filter,
+				cursorFilter,
+			},
+		}
+		args.Skip = 0
 	}
-
-	r1, count, err := me.Client.QueryAllWithCursor(struct {
-		Collection   string
-		Index        string
-		Sort         bson.M
-		Filter       bson.M
-		Query        []string
-		Limit        int64
-		Skip         int64
-		CursorFilter bson.M
+	queryLimit := args.Limit + 1
+	r1, count, err := me.Client.QueryAll(struct {
+		Collection string
+		Index      string
+		Sort       bson.M
+		Filter     bson.M
+		Query      []string
+		Limit      int64
+		Skip       int64
 	}{
-		Collection:   "Address-Asset",
-		Index:        "GetAssetHoldersListByContractHash",
-		Sort:         bson.M{"_id": -1},
-		Filter:       bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}},
-		Query:        []string{},
-		Limit:        args.Limit,
-		Skip:         args.Skip,
-		CursorFilter: cursorFilter,
+		Collection: "Address-Asset",
+		Index:      "GetAssetHoldersListByContractHash",
+		Sort:       bson.M{"_id": -1},
+		Filter:     filter,
+		Query:      []string{},
+		Limit:      queryLimit,
+		Skip:       args.Skip,
 	}, ret)
+	if err != nil {
+		return err
+	}
+	hasNext := int64(len(r1)) > args.Limit
+	page := r1
+	if hasNext {
+		page = r1[:args.Limit]
+	}
 
 	// 获取资产的totaluspply
 	var raw1 map[string]interface{}
@@ -73,7 +91,7 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 	it := raw1["totalsupply"].(*big.Int)
 	itf := new(big.Float).SetInt(it)
 
-	for _, item := range r1 {
+	for _, item := range page {
 
 		ib, _, err := item["balance"].(primitive.Decimal128).BigInt()
 		if err != nil {
@@ -85,12 +103,24 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 	}
 
 	if args.Raw != nil {
-		*args.Raw = r1
+		*args.Raw = page
 	}
 
 	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		oid, ok := last["_id"].(primitive.ObjectID)
+		if !ok {
+			return stderr.ErrInvalidArgs
+		}
+		nextCursor, err := encodeOIDCursor(oid)
+		if err != nil {
+			return err
+		}
+		r2["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {
