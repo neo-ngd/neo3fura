@@ -6,7 +6,7 @@ info:
     Neo3Fura HTTP endpoint is JSON-RPC 2.0 over POST `/`.
     This OpenAPI file documents common methods and pagination behavior.
 servers:
-  - url: http://127.0.0.1:1926
+  - url: https://testmagnet.ngd.network/
     description: Local
 paths:
   /:
