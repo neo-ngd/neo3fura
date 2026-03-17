@@ -5,9 +5,9 @@ services:
     build:
       context: "./neo3fura_http"
       args:
-        RT: staging
+        RT: ${RUNTIME:-staging}
     environment:
-      RUNTIME: staging
+      RUNTIME: ${RUNTIME:-staging}
     ports:
       - "1927:1926"
     networks:
@@ -16,7 +16,7 @@ services:
     container_name: service_http_mainnet
     volumes:
       - ./logs:/go/application/Logs/
-      - /opt/tokenuri/main/:/go/application/tokenURI/
+      - ${TOKENURI_MAINNET_DIR:-./tokenURI/mainnet}:/go/application/tokenURI/
     depends_on:
       - redis
       - mongo
@@ -25,9 +25,9 @@ services:
     build:
       context: "./neo3fura_ws"
       args:
-        RT: staging
+        RT: ${RUNTIME:-staging}
     environment:
-      RUNTIME: staging
+      RUNTIME: ${RUNTIME:-staging}
     ports:
       - "2027:2026"
     networks:
@@ -46,7 +46,7 @@ services:
       - network
     restart: always
     ports:
-      - "6380:6379"
+      - "${MAINNET_REDIS_PORT:-6380}:6379"
     container_name: cache_mainnet
 
   mongo:

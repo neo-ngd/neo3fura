@@ -5,9 +5,9 @@ services:
     build:
       context: "./neo3fura_http"
       args:
-        RT: test
+        RT: ${RUNTIME:-test}
     environment:
-      RUNTIME: test
+      RUNTIME: ${RUNTIME:-test}
     ports:
       - "1929:1926"
     networks:
@@ -16,7 +16,7 @@ services:
     container_name: service_http_testnet
     volumes:
       - ./logs:/go/application/Logs/
-      - /opt/tokenuri/magnet/:/go/application/tokenURI/
+      - ${TOKENURI_TESTNET_DIR:-./tokenURI/testnet}:/go/application/tokenURI/
     depends_on:
       - redis
       - mongo
@@ -25,9 +25,9 @@ services:
     build:
       context: "./neo3fura_ws"
       args:
-        RT: test
+        RT: ${RUNTIME:-test}
     environment:
-      RUNTIME: test
+      RUNTIME: ${RUNTIME:-test}
     ports:
       - "2028:2026"
     networks:

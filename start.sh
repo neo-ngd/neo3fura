@@ -5,12 +5,18 @@ set -eu
 usage() {
     cat <<'EOF'
 Usage:
-  ./start.sh mainnet
-  ./start.sh testnet
+  ./start.sh <runtime>
+
+Supported runtimes:
+  dev | test | test2 | staging
+
+Compatibility aliases:
+  ./start.sh mainnet   # same as staging
+  ./start.sh testnet   # same as test
 
 Legacy aliases:
-  ./start.sh STAGING   # mainnet
-  ./start.sh TEST      # testnet
+  ./start.sh STAGING
+  ./start.sh TEST
 EOF
 }
 
@@ -26,12 +32,32 @@ else
 fi
 
 case "$1" in
-    mainnet|MAINNET|STAGING|staging)
+    dev|DEV)
+        PROJECT="dev"
+        COMPOSE_FILE="docker-compose.yml"
+        RUNTIME="dev"
+        ;;
+    test|TEST)
+        PROJECT="testnet"
+        COMPOSE_FILE="docker-compose.testnet.yml"
+        RUNTIME="test"
+        ;;
+    test2|TEST2)
+        PROJECT="test2"
+        COMPOSE_FILE="docker-compose.yml"
+        RUNTIME="test2"
+        ;;
+    staging|STAGING)
         PROJECT="mainnet"
         COMPOSE_FILE="docker-compose.mainnet.yml"
         RUNTIME="staging"
         ;;
-    testnet|TESTNET|TEST|test)
+    mainnet|MAINNET)
+        PROJECT="mainnet"
+        COMPOSE_FILE="docker-compose.mainnet.yml"
+        RUNTIME="staging"
+        ;;
+    testnet|TESTNET)
         PROJECT="testnet"
         COMPOSE_FILE="docker-compose.testnet.yml"
         RUNTIME="test"

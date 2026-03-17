@@ -6,8 +6,10 @@ For more info, Please refer to [Neofura-Doc](https://neo-ngd.github.io/neo3fura/
 ## Quick Start
 
 ```
-./start.sh mainnet
-./start.sh testnet
+./start.sh staging
+./start.sh test
+./start.sh test2
+./start.sh dev
 ```
 
 Compose files:
@@ -15,12 +17,18 @@ Compose files:
 ```
 docker compose -p mainnet -f docker-compose.mainnet.yml up -d --build
 docker compose -p testnet -f docker-compose.testnet.yml up -d --build
+docker compose -p test2 -f docker-compose.yml up -d --build
+docker compose -p dev -f docker-compose.yml up -d --build
 ```
 
-In the current runtime mapping:
+`./start.sh` now treats its single argument as the runtime. Supported values are `dev`, `test`, `test2`, and `staging`.
 
-- `mainnet` uses `RUNTIME=staging`
-- `testnet` uses `RUNTIME=test`
+Compatibility aliases are also available:
+
+- `./start.sh staging` maps to mainnet with `RUNTIME=staging`
+- `./start.sh test` maps to testnet with `RUNTIME=test`
+- `./start.sh mainnet` is the same as `./start.sh staging`
+- `./start.sh testnet` is the same as `./start.sh test`
 
 The two compose files publish the same host ports, so they are intended to be run one at a time on the same machine.
 
