@@ -5,9 +5,24 @@ For more info, Please refer to [Neofura-Doc](https://neo-ngd.github.io/neo3fura/
 
 ## Quick Start
 
-``
-./start.sh + environment(environment can be "dev","test","staging")
-``
+```
+./start.sh mainnet
+./start.sh testnet
+```
+
+Compose files:
+
+```
+docker compose -p mainnet -f docker-compose.mainnet.yml up -d --build
+docker compose -p testnet -f docker-compose.testnet.yml up -d --build
+```
+
+In the current runtime mapping:
+
+- `mainnet` uses `RUNTIME=staging`
+- `testnet` uses `RUNTIME=test`
+
+The two compose files publish the same host ports, so they are intended to be run one at a time on the same machine.
 
 ## API Examples
 

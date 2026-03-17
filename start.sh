@@ -1,32 +1,47 @@
 #!/bin/sh
-echo shut down existed docker service
-echo you env is $1
-if [ $1 == "TEST" ]
-then
-    export RUNTIME="test"
-    docker stop service_ws_test
-    docker stop service_http_test
 
-    docker container rm service_ws_test
-    docker container rm service_http_test
+set -eu
 
-    docker rmi test_neofura_http -f
-    docker rmi test_neofura_ws -f
-    docker-compose -p "test" up -d
+usage() {
+    cat <<'EOF'
+Usage:
+  ./start.sh mainnet
+  ./start.sh testnet
+
+Legacy aliases:
+  ./start.sh STAGING   # mainnet
+  ./start.sh TEST      # testnet
+EOF
+}
+
+if [ "$#" -ne 1 ]; then
+    usage
+    exit 1
 fi
 
-if [ $1 == "STAGING" ]
-then
-    export RUNTIME="staging"
-    docker stop service_ws_staging
-    docker stop service_http_staging
-
-    docker container rm service_ws_staging
-    docker container rm service_http_staging
-
-    docker rmi staging_neofura_http -f
-    docker rmi staging_neofura_ws -f
-    docker-compose -p "staging" up -d
+if docker compose version >/dev/null 2>&1; then
+    DOCKER_COMPOSE="docker compose"
+else
+    DOCKER_COMPOSE="docker-compose"
 fi
 
+case "$1" in
+    mainnet|MAINNET|STAGING|staging)
+        PROJECT="mainnet"
+        COMPOSE_FILE="docker-compose.mainnet.yml"
+        ;;
+    testnet|TESTNET|TEST|test)
+        PROJECT="testnet"
+        COMPOSE_FILE="docker-compose.testnet.yml"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
+
+echo "starting ${PROJECT} with ${COMPOSE_FILE}"
+
+$DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" down --remove-orphans
+$DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" up -d --build
 

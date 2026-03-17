@@ -1,0 +1,103 @@
+version: "3.3"
+
+services:
+  neofura_http:
+    build:
+      context: "./neo3fura_http"
+      args:
+        RT: staging
+    ports:
+      - "1927:1926"
+    networks:
+      - network
+    restart: always
+    container_name: service_http_mainnet
+    volumes:
+      - ./logs:/go/application/Logs/
+      - /opt/tokenuri/main/:/go/application/tokenURI/
+    depends_on:
+      - redis
+      - mongo
+
+  neofura_ws:
+    build:
+      context: "./neo3fura_ws"
+      args:
+        RT: staging
+    ports:
+      - "2027:2026"
+    networks:
+      - network
+    restart: always
+    container_name: service_ws_mainnet
+    volumes:
+      - ./logs_ws:/go/application/Logs/
+    depends_on:
+      - redis
+      - mongo
+
+  redis:
+    image: redis
+    networks:
+      - network
+    restart: always
+    ports:
+      - "6380:6379"
+    container_name: cache_mainnet
+
+  mongo:
+    image: mongo
+    restart: always
+    container_name: mongo_mainnet
+    networks:
+      - network
+    ports:
+      - "27002:27017"
+    expose:
+      - "27017"
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    container_name: mongo_express_mainnet
+    ports:
+      - "8082:8081"
+    networks:
+      - network
+    environment:
+      ME_CONFIG_BASICAUTH_USERNAME: change_the_admin
+      ME_CONFIG_BASICAUTH_PASSWORD: change_the_password
+    depends_on:
+      - mongo
+
+  prometheus:
+    image: prom/prometheus:v2.6.1
+    container_name: prometheus_mainnet
+    ports:
+      - "9092:9090"
+    expose:
+      - "9092"
+    networks:
+      - network
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./data/prometheus:/data
+    depends_on:
+      - neofura_http
+      - neofura_ws
+
+  grafana:
+    image: grafana/grafana:5.1.0
+    container_name: grafana_mainnet
+    ports:
+      - "3001:3000"
+    expose:
+      - "3000"
+    networks:
+      - network
+    user: "104"
+    depends_on:
+      - prometheus
+
+networks:
+  network:
