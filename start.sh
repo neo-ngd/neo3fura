@@ -72,5 +72,7 @@ export RUNTIME
 
 echo "starting ${PROJECT} with ${COMPOSE_FILE} (RUNTIME=${RUNTIME})"
 
-$DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" down --remove-orphans
-$DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" up -d --build
+echo "recreating neofura_http and neofura_ws only; existing dependencies will be reused"
+
+$DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" rm -sf neofura_http neofura_ws
+$DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" up -d --build neofura_http neofura_ws
