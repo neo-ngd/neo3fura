@@ -3,8 +3,6 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/big"
 	"neo3fura_http/lib/type/Contract"
 	"neo3fura_http/lib/type/h160"
@@ -14,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (me *T) GetNFTByAssetClassPrimaryMarket(args struct {
@@ -419,9 +420,6 @@ func (me *T) GetNFTInfoPrimaryMarket(Market string, Asset string, Tokenid string
 						if time > finishTime {
 							finishTime = time
 							item["lastSoldAsset"] = data["offerAsset"]
-							if err != nil {
-								return nil, err
-							}
 							item["lastSoldAmount"] = data["offerAmount"]
 
 						}

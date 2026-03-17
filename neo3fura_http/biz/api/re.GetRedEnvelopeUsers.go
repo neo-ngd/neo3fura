@@ -4,16 +4,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/joeqian10/neo3-gogogo/crypto"
-	"github.com/joeqian10/neo3-gogogo/helper"
-	"github.com/joeqian10/neo3-gogogo/rpc"
-	"github.com/joeqian10/neo3-gogogo/sc"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	log2 "neo3fura_http/lib/log"
 	"neo3fura_http/lib/type/Contract"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
 	"os"
+
+	"github.com/joeqian10/neo3-gogogo/crypto"
+	"github.com/joeqian10/neo3-gogogo/helper"
+	"github.com/joeqian10/neo3-gogogo/rpc"
+	"github.com/joeqian10/neo3-gogogo/sc"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -156,5 +157,4 @@ func isExpiresNNS(endPoint string, contract Contract.T, nns string) (bool, error
 	} else {
 		return false, nil
 	}
-	return false, nil
 }

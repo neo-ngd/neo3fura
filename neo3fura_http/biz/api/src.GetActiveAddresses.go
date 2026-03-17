@@ -25,9 +25,6 @@ func (me *T) GetActiveAddresses(args struct {
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
 	r, err := json.Marshal(r1)
 	if err != nil {
 		return err

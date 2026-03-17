@@ -132,9 +132,6 @@ func (me *T) GetAssetInfoByContracts(args struct {
 
 	}
 
-	if err != nil {
-		return err
-	}
 	r2, err := me.FilterArrayAndAppendCount(r1, int64(len(args.ContractHash)), args.Filter)
 	if err != nil {
 		return err

@@ -2,10 +2,11 @@ package api
 
 import (
 	"encoding/json"
-	"go.mongodb.org/mongo-driver/bson"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/lib/type/strval"
 	"neo3fura_http/var/stderr"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func (me *T) GetBidInfoByNFT(args struct {
@@ -49,21 +50,21 @@ func (me *T) GetBidInfoByNFT(args struct {
 	}
 
 	rs, count, err := me.Client.QueryAllWithCursor(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
 		CursorFilter bson.M
 	}{
-		Collection: "MarketNotification",
-		Index:      "GetBidInfoByNFT",
-		Sort:       bson.M{"nonce": -1},
-		Filter:     f,
-		Query:      []string{},
-		Limit:      1,
+		Collection:   "MarketNotification",
+		Index:        "GetBidInfoByNFT",
+		Sort:         bson.M{"nonce": -1},
+		Filter:       f,
+		Query:        []string{},
+		Limit:        1,
 		CursorFilter: nil,
 	}, ret)
 	if err != nil {
@@ -75,20 +76,20 @@ func (me *T) GetBidInfoByNFT(args struct {
 	}
 
 	r1, count, err := me.Client.QueryAllWithCursor(struct {
-		Collection string
-		Index      string
-		Sort       bson.M
-		Filter     bson.M
-		Query      []string
-		Limit      int64
-		Skip       int64
+		Collection   string
+		Index        string
+		Sort         bson.M
+		Filter       bson.M
+		Query        []string
+		Limit        int64
+		Skip         int64
 		CursorFilter bson.M
 	}{
-		Collection: "MarketNotification",
-		Index:      "GetBidInfoByNFT",
-		Sort:       bson.M{"timestamp": -1},
-		Filter:     f,
-		Query:      []string{},
+		Collection:   "MarketNotification",
+		Index:        "GetBidInfoByNFT",
+		Sort:         bson.M{"timestamp": -1},
+		Filter:       f,
+		Query:        []string{},
 		CursorFilter: nil,
 	}, ret)
 	if err != nil {
@@ -106,9 +107,6 @@ func (me *T) GetBidInfoByNFT(args struct {
 		extendData := item["extendData"].(string)
 		var dat map[string]interface{}
 		if err1 := json.Unmarshal([]byte(extendData), &dat); err1 == nil {
-			if err1 != nil {
-				return err
-			}
 			auctionAsset := dat["auctionAsset"]
 			bidAmount := dat["bidAmount"]
 			rr["bidAmount"] = bidAmount

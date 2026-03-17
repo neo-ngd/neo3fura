@@ -25,9 +25,7 @@ func (me *T) GetNewAddresses(args struct {
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
+
 	r, err := json.Marshal(r1)
 	if err != nil {
 		return err
