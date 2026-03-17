@@ -6,6 +6,8 @@ services:
       context: "./neo3fura_http"
       args:
         RT: staging
+    environment:
+      RUNTIME: staging
     ports:
       - "1927:1926"
     networks:
@@ -24,6 +26,8 @@ services:
       context: "./neo3fura_ws"
       args:
         RT: staging
+    environment:
+      RUNTIME: staging
     ports:
       - "2027:2026"
     networks:

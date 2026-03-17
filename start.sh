@@ -29,10 +29,12 @@ case "$1" in
     mainnet|MAINNET|STAGING|staging)
         PROJECT="mainnet"
         COMPOSE_FILE="docker-compose.mainnet.yml"
+        RUNTIME="staging"
         ;;
     testnet|TESTNET|TEST|test)
         PROJECT="testnet"
         COMPOSE_FILE="docker-compose.testnet.yml"
+        RUNTIME="test"
         ;;
     *)
         usage
@@ -40,8 +42,9 @@ case "$1" in
         ;;
 esac
 
-echo "starting ${PROJECT} with ${COMPOSE_FILE}"
+export RUNTIME
+
+echo "starting ${PROJECT} with ${COMPOSE_FILE} (RUNTIME=${RUNTIME})"
 
 $DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" down --remove-orphans
 $DOCKER_COMPOSE -p "$PROJECT" -f "$COMPOSE_FILE" up -d --build
-

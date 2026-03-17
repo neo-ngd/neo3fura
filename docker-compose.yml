@@ -5,6 +5,8 @@ services:
       context: "./neo3fura_http"
       args:
         RT: ${RUNTIME}
+    environment:
+      RUNTIME: ${RUNTIME}
     ports:
       - "1926:1926"
     networks:
@@ -22,6 +24,8 @@ services:
       context: "./neo3fura_ws"
       args:
         RT: ${RUNTIME}
+    environment:
+      RUNTIME: ${RUNTIME}
     ports:
       - "2026:2026"
     networks:
