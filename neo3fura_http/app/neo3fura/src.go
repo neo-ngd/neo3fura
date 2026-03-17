@@ -481,7 +481,7 @@ func buildSwaggerOpenAPIDoc() map[string]interface{} {
 			"description": "Swagger exposes each RPC method at /swagger/rpc/{Method}.",
 		},
 		"servers": []map[string]interface{}{
-			{"url": "http://127.0.0.1:1926"},
+			{"url": "https://testmagnet.ngd.network/"},
 		},
 		"paths": paths,
 		"components": map[string]interface{}{
