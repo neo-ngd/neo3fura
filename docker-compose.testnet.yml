@@ -47,12 +47,12 @@ services:
     restart: always
     ports:
       - "6382:6379"
-    container_name: cache_testnet
+    container_name: cache_test2
 
   mongo:
     image: mongo
     restart: always
-    container_name: mongo_testnet
+    container_name: mongo_test2
     networks:
       - network
     ports:
@@ -63,7 +63,7 @@ services:
   mongo-express:
     image: mongo-express
     restart: always
-    container_name: mongo_express_testnet
+    container_name: mongo_express_test2
     ports:
       - "8083:8081"
     networks:
@@ -76,7 +76,7 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.6.1
-    container_name: prometheus_testnet
+    container_name: prometheus_test2
     ports:
       - "9093:9090"
     expose:
@@ -92,7 +92,7 @@ services:
 
   grafana:
     image: grafana/grafana:5.1.0
-    container_name: grafana_testnet
+    container_name: grafana_test2
     ports:
       - "3002:3000"
     expose:
