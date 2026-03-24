@@ -8,7 +8,6 @@ import (
 	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -25,6 +24,7 @@ func (me *T) GetRawTransactionByAddress(args struct {
 
 	sortKeys := []string{"_id"}
 	sortDirs := map[string]int{"_id": -1}
+	queryLimit := args.Limit + 1
 
 	var cursorFilter bson.M
 	if args.Cursor != "" {
@@ -44,16 +44,16 @@ func (me *T) GetRawTransactionByAddress(args struct {
 		Limit        int64
 		Skip         int64
 		CursorFilter bson.M
-	}{
-		Collection:   "Transaction",
-		Index:        "GetRawTransactionByAddress",
-		Sort:         bson.M{"_id": -1},
-		Filter:       bson.M{"sender": args.Address.TransferAddress()},
-		Query:        []string{},
-		Limit:        args.Limit,
-		Skip:         args.Skip,
-		CursorFilter: cursorFilter,
-	}, ret)
+		}{
+			Collection:   "Transaction",
+			Index:        "GetRawTransactionByAddress",
+			Sort:         bson.M{"_id": -1},
+			Filter:       bson.M{"sender": args.Address.TransferAddress()},
+			Query:        []string{},
+			Limit:        queryLimit,
+			Skip:         args.Skip,
+			CursorFilter: cursorFilter,
+		}, ret)
 	if err != nil {
 		return err
 	}
@@ -94,19 +94,15 @@ func (me *T) GetRawTransactionByAddress(args struct {
 		}
 	}
 
-	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
+	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
 	if err != nil {
 		return err
 	}
 	if hasNext {
 		last := page[len(page)-1]
-		oid, ok := last["_id"].(primitive.ObjectID)
-		if !ok {
+		nextCursor := EncodeCursor(last, sortKeys)
+		if nextCursor == "" {
 			return stderr.ErrInvalidArgs
-		}
-		nextCursor, err := encodeOIDCursor(oid)
-		if err != nil {
-			return err
 		}
 		r2["nextCursor"] = nextCursor
 	}

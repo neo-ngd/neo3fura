@@ -8,7 +8,6 @@ import (
 	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (me *T) GetNep11TransferByContractHashTokenId(args struct {
@@ -41,6 +40,7 @@ func (me *T) GetNep11TransferByContractHashTokenId(args struct {
 
 	sortKeys := []string{"_id"}
 	sortDirs := map[string]int{"_id": -1}
+	queryLimit := args.Limit + 1
 
 	var cursorFilter bson.M
 	if args.Cursor != "" {
@@ -60,16 +60,16 @@ func (me *T) GetNep11TransferByContractHashTokenId(args struct {
 		Limit        int64
 		Skip         int64
 		CursorFilter bson.M
-	}{
-		Collection:   "Nep11TransferNotification",
-		Index:        "GetNep11TransferByAddress",
-		Sort:         bson.M{"_id": -1},
-		Filter:       f,
-		Query:        []string{},
-		Limit:        args.Limit,
-		Skip:         args.Skip,
-		CursorFilter: cursorFilter,
-	}, ret)
+		}{
+			Collection:   "Nep11TransferNotification",
+			Index:        "GetNep11TransferByAddress",
+			Sort:         bson.M{"_id": -1},
+			Filter:       f,
+			Query:        []string{},
+			Limit:        queryLimit,
+			Skip:         args.Skip,
+			CursorFilter: cursorFilter,
+		}, ret)
 	hasNext := int64(len(r1)) > args.Limit
 	page := r1
 	if hasNext {
@@ -82,19 +82,15 @@ func (me *T) GetNep11TransferByContractHashTokenId(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
+	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
 	if err != nil {
 		return err
 	}
 	if hasNext {
 		last := page[len(page)-1]
-		oid, ok := last["_id"].(primitive.ObjectID)
-		if !ok {
+		nextCursor := EncodeCursor(last, sortKeys)
+		if nextCursor == "" {
 			return stderr.ErrInvalidArgs
-		}
-		nextCursor, err := encodeOIDCursor(oid)
-		if err != nil {
-			return err
 		}
 		r2["nextCursor"] = nextCursor
 	}

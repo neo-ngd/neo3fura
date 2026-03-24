@@ -29,11 +29,11 @@ func (me *T) GetAddressList(args struct {
 	}
 	queryLimit := args.Limit + 1
 
-	sortKeys := []string{"firstusetime"}
-	sortDirs := map[string]int{"firstusetime": -1}
+	sortKeys := []string{"firstusetime", "_id"}
+	sortDirs := map[string]int{"firstusetime": -1, "_id": -1}
 
 	pipeline := []bson.M{
-		bson.M{"$sort": bson.M{"firstusetime": -1}},
+		bson.M{"$sort": bson.M{"firstusetime": -1, "_id": -1}},
 	}
 
 	if args.Cursor != "" {
@@ -172,23 +172,15 @@ func (me *T) GetAddressList(args struct {
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count["total counts"].(int64), args.Filter, sortKeys)
+	r2, err := me.FilterArrayAndAppendCount(page, count["total counts"].(int64), args.Filter)
 	if err != nil {
 		return err
 	}
 	if hasNext {
 		last := page[len(page)-1]
-		sortValue, ok := int64FromAny(last["firstusetime"])
-		if !ok {
+		nextCursor := EncodeCursor(last, sortKeys)
+		if nextCursor == "" {
 			return stderr.ErrInvalidArgs
-		}
-		oid, ok := last["_id"].(primitive.ObjectID)
-		if !ok {
-			return stderr.ErrInvalidArgs
-		}
-		nextCursor, err := encodeIntDescCursor(sortValue, oid)
-		if err != nil {
-			return err
 		}
 		r2["nextCursor"] = nextCursor
 	}

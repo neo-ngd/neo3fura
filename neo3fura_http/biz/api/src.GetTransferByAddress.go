@@ -35,6 +35,8 @@ func (me *T) GetTransferByAddress(args struct {
 		bson.M{"from": args.Address.TransferredVal()},
 		bson.M{"to": args.Address.TransferredVal()},
 	}}
+	sortKeys := []string{"timestamp", "_id"}
+	sortDirs := map[string]int{"timestamp": -1, "_id": -1}
 	queryLimit := args.Limit + 1
 	fetchLimit := args.Skip + queryLimit
 	if fetchLimit > consts.MaxLimit {
@@ -43,11 +45,11 @@ func (me *T) GetTransferByAddress(args struct {
 
 	var cursorFilter bson.M
 	if args.Cursor != "" {
-		decodedFilter, err := buildIntDescCursorFilter("timestamp", args.Cursor)
+		cursorValues, err := DecodeCursor(args.Cursor)
 		if err != nil {
 			return err
 		}
-		cursorFilter = decodedFilter
+		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
 		args.Skip = 0
 		fetchLimit = queryLimit
 	}
@@ -165,17 +167,9 @@ func (me *T) GetTransferByAddress(args struct {
 	}
 	if hasNext {
 		last := page[len(page)-1]
-		sortValue, ok := int64FromAny(last["timestamp"])
-		if !ok {
+		nextCursor := EncodeCursor(last, sortKeys)
+		if nextCursor == "" {
 			return stderr.ErrInvalidArgs
-		}
-		oid, ok := last["_id"].(primitive.ObjectID)
-		if !ok {
-			return stderr.ErrInvalidArgs
-		}
-		nextCursor, err := encodeIntDescCursor(sortValue, oid)
-		if err != nil {
-			return err
 		}
 		r5["nextCursor"] = nextCursor
 	}

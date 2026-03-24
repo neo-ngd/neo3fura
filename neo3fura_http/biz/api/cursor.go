@@ -173,3 +173,18 @@ func MergeCursorFilter(existingFilter bson.M, cursorFilter bson.M) bson.M {
 	andClauses := []interface{}{existingFilter, cursorFilter}
 	return bson.M{"$and": andClauses}
 }
+
+func int64FromAny(v interface{}) (int64, bool) {
+	switch t := v.(type) {
+	case int:
+		return int64(t), true
+	case int32:
+		return int64(t), true
+	case int64:
+		return t, true
+	case float64:
+		return int64(t), true
+	default:
+		return 0, false
+	}
+}

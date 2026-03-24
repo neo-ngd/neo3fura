@@ -53,27 +53,13 @@ func (me *T) GetNep11TransferByAddress(args struct {
 		baseFilter["timestamp"] = bson.M{"$lte": args.Start}
 
 	}
-	filter := baseFilter
-	if args.Cursor != "" {
-		cursorFilter, err := buildIntDescCursorFilter("timestamp", args.Cursor)
-		if err != nil {
-			return err
-		}
-		filter = bson.M{
-			"$and": []interface{}{
-				filter,
-				cursorFilter,
-			},
-		}
-		args.Skip = 0
-	}
 	queryLimit := args.Limit + 1
 
 	sortKeys := []string{"timestamp", "_id"}
 	sortDirs := map[string]int{"timestamp": -1, "_id": -1}
 
 	pipeline := []bson.M{
-		bson.M{"$match": filter},
+		bson.M{"$match": baseFilter},
 		bson.M{"$sort": bson.M{"timestamp": -1, "_id": -1}},
 	}
 
@@ -176,23 +162,15 @@ func (me *T) GetNep11TransferByAddress(args struct {
 		delete(item, "transaction")
 	}
 
-	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count["total counts"].(int64), args.Filter, sortKeys)
+	r2, err := me.FilterArrayAndAppendCount(page, count["total counts"].(int64), args.Filter)
 	if err != nil {
 		return err
 	}
 	if hasNext {
 		last := page[len(page)-1]
-		sortValue, ok := int64FromAny(last["timestamp"])
-		if !ok {
+		nextCursor := EncodeCursor(last, sortKeys)
+		if nextCursor == "" {
 			return stderr.ErrInvalidArgs
-		}
-		oid, ok := last["_id"].(primitive.ObjectID)
-		if !ok {
-			return stderr.ErrInvalidArgs
-		}
-		nextCursor, err := encodeIntDescCursor(sortValue, oid)
-		if err != nil {
-			return err
 		}
 		r2["nextCursor"] = nextCursor
 	}

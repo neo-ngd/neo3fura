@@ -32,18 +32,15 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 		args.Skip = 0
 	}
 	sortKeys := []string{"_id"}
+	sortDirs := map[string]int{"_id": -1}
 	filter := bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}}
 	if args.Cursor != "" {
-		cursorFilter, err := buildOIDDescCursorFilter(args.Cursor)
+		cursorValues, err := DecodeCursor(args.Cursor)
 		if err != nil {
 			return err
 		}
-		filter = bson.M{
-			"$and": []interface{}{
-				filter,
-				cursorFilter,
-			},
-		}
+		cursorFilter := BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+		filter = MergeCursorFilter(filter, cursorFilter)
 		args.Skip = 0
 	}
 	queryLimit := args.Limit + 1
@@ -107,19 +104,15 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 		*args.Raw = page
 	}
 
-	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
+	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
 	if err != nil {
 		return err
 	}
 	if hasNext {
 		last := page[len(page)-1]
-		oid, ok := last["_id"].(primitive.ObjectID)
-		if !ok {
+		nextCursor := EncodeCursor(last, sortKeys)
+		if nextCursor == "" {
 			return stderr.ErrInvalidArgs
-		}
-		nextCursor, err := encodeOIDCursor(oid)
-		if err != nil {
-			return err
 		}
 		r2["nextCursor"] = nextCursor
 	}
