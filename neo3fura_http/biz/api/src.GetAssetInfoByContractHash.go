@@ -120,9 +120,9 @@ func (me *T) GetAssetInfoByContractHash(args struct {
 		*args.Raw = r1
 	}
 	r1["holders"] = count
-	totalsuply, _, err := r1["totalsupply"].(primitive.Decimal128).BigInt()
-	if err != nil {
-		return err
+	totalsuply, ok := asBigInt(r1["totalsupply"])
+	if !ok {
+		return stderr.ErrData
 	}
 	r1["totalsupply"] = totalsuply
 	if r1["type"].(string) == "NEP11" {

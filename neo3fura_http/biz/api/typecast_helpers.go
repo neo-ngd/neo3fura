@@ -62,6 +62,12 @@ func asDecimalString(v interface{}) (string, bool) {
 
 func asBigInt(v interface{}) (*big.Int, bool) {
 	switch x := v.(type) {
+	case primitive.Decimal128:
+		n, _, err := x.BigInt()
+		if err != nil {
+			return nil, false
+		}
+		return n, true
 	case *big.Int:
 		return x, true
 	case int64:

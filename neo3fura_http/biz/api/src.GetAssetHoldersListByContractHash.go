@@ -8,7 +8,6 @@ import (
 	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func (me *T) GetAssetHoldersListByContractHash(args struct {
@@ -86,14 +85,17 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 	//	return err
 	//}
 
-	it := raw1["totalsupply"].(*big.Int)
+	it, ok := asBigInt(raw1["totalsupply"])
+	if !ok {
+		return stderr.ErrData
+	}
 	itf := new(big.Float).SetInt(it)
 
 	for _, item := range page {
 
-		ib, _, err := item["balance"].(primitive.Decimal128).BigInt()
-		if err != nil {
-			return err
+		ib, ok := asBigInt(item["balance"])
+		if !ok {
+			return stderr.ErrData
 		}
 		ibf := new(big.Float).SetInt(ib)
 		dv := new(big.Float).Quo(ibf, itf)
