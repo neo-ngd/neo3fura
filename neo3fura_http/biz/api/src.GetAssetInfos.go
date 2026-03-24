@@ -83,22 +83,32 @@ func (me *T) GetAssetInfos(args struct {
 
 	// retrieve all tokens
 	r2, err := me.Client.QueryLastJob(struct{ Collection string }{Collection: "PopularTokens"})
-	if err != nil {
+	if err != nil && err != stderr.ErrNotFound {
 		return err
 	}
 	r3, err := me.Client.QueryLastJob(struct{ Collection string }{Collection: "Holders"})
-	if err != nil {
+	if err != nil && err != stderr.ErrNotFound {
 		return err
 	}
+	populars := primitive.A{}
+	if r2 != nil {
+		if p, ok := r2["Populars"].(primitive.A); ok {
+			populars = p
+		}
+	}
+	holders := primitive.A{}
+	if r3 != nil {
+		if h, ok := r3["Holders"].(primitive.A); ok {
+			holders = h
+		}
+	}
 	for _, item := range r1 {
-		populars := r2["Populars"].(primitive.A)
 		item["ispopular"] = false
 		for _, v := range populars {
 			if item["hash"] == v {
 				item["ispopular"] = true
 			}
 		}
-		holders := r3["Holders"].(primitive.A)
 		for _, h := range holders {
 			m := h.(map[string]interface{})
 			for k, v := range m {
@@ -110,14 +120,14 @@ func (me *T) GetAssetInfos(args struct {
 
 		raw1 := make(map[string]interface{})
 		if item["type"] == "Unknown" {
-			err := me.GetContractByContractHash(struct {
-				ContractHash h160.T
-				Filter       map[string]interface{}
-				Raw          *map[string]interface{}
-			}{ContractHash: h160.T(fmt.Sprint(item["hash"])), Filter: nil, Raw: &raw1}, ret)
-			if err != nil {
-				return nil
-			}
+				err := me.GetContractByContractHash(struct {
+					ContractHash h160.T
+					Filter       map[string]interface{}
+					Raw          *map[string]interface{}
+				}{ContractHash: h160.T(fmt.Sprint(item["hash"])), Filter: nil, Raw: &raw1}, ret)
+				if err != nil {
+					continue
+				}
 			m := make(map[string]interface{})
 			json.Unmarshal([]byte(raw1["manifest"].(string)), &m)
 			methods := m["abi"].(map[string]interface{})["methods"].([]interface{})

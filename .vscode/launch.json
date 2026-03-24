@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "neofura_http test",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "dlvFlags": ["--check-go-version=false"],
+      "program": "${workspaceFolder}/neo3fura_http/app/neo3fura",
+      "cwd": "${workspaceFolder}/neo3fura_http",
+      "env": {
+        "RUNTIME": "test"
+      }
+    },
+    {
+      "name": "neofura_http staging",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "dlvFlags": ["--check-go-version=false"],
+      "program": "${workspaceFolder}/neo3fura_http/app/neo3fura",
+      "cwd": "${workspaceFolder}/neo3fura_http",
+      "env": {
+        "RUNTIME": "staging"
+      }
+    },
+    {
+      "name": "neofura_http dev",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "dlvFlags": ["--check-go-version=false"],
+      "program": "${workspaceFolder}/neo3fura_http/app/neo3fura",
+      "cwd": "${workspaceFolder}/neo3fura_http",
+      "env": {
+        "RUNTIME": "dev"
+      }
+    }
+  ]
+}
