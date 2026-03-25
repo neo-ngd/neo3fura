@@ -2,13 +2,10 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"neo3fura_http/lib/type/h160"
-	"neo3fura_http/lib/type/h256"
 	"neo3fura_http/var/stderr"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (me *T) GetRawTransactionByAddress(args struct {
@@ -44,16 +41,16 @@ func (me *T) GetRawTransactionByAddress(args struct {
 		Limit        int64
 		Skip         int64
 		CursorFilter bson.M
-		}{
-			Collection:   "Transaction",
-			Index:        "GetRawTransactionByAddress",
-			Sort:         bson.M{"_id": -1},
-			Filter:       bson.M{"sender": args.Address.TransferAddress()},
-			Query:        []string{},
-			Limit:        queryLimit,
-			Skip:         args.Skip,
-			CursorFilter: cursorFilter,
-		}, ret)
+	}{
+		Collection:   "Transaction",
+		Index:        "GetRawTransactionByAddress",
+		Sort:         bson.M{"_id": -1},
+		Filter:       bson.M{"sender": args.Address.TransferAddress()},
+		Query:        []string{},
+		Limit:        queryLimit,
+		Skip:         args.Skip,
+		CursorFilter: cursorFilter,
+	}, ret)
 	if err != nil {
 		return err
 	}
@@ -62,35 +59,41 @@ func (me *T) GetRawTransactionByAddress(args struct {
 	if hasNext {
 		page = r1[:args.Limit]
 	}
-	var raw1 map[string]interface{}
+
+	txIDs := make([]string, 0, len(page))
 	for _, item := range page {
-		err = me.GetVmStateByTransactionHash(struct {
-			TransactionHash h256.T
-			Filter          map[string]interface{}
-			Raw             *map[string]interface{}
-		}{
-			TransactionHash: h256.T(fmt.Sprint(item["hash"])),
-			Filter:          nil,
-			Raw:             &raw1,
-		}, ret)
-		if err != nil {
-			return err
+		hash, ok := item["hash"].(string)
+		if ok && hash != "" {
+			txIDs = append(txIDs, hash)
 		}
-		item["vmstate"] = raw1["vmstate"].(string)
-		if raw1["vmstate"].(string) == "FAULT" {
-			var raw2 map[string]interface{}
-			err = me.GetTransferEventByTransactionHash(struct {
-				TransactionHash h256.T
-				Filter          map[string]interface{}
-				Raw             *map[string]interface{}
-			}{TransactionHash: h256.T(fmt.Sprint(item["hash"])), Filter: nil, Raw: &raw2}, ret)
-			if err == mongo.ErrNoDocuments {
-				item["faultdetail"] = nil
-			}
-			if err != nil && err != mongo.ErrNoDocuments {
-				return err
-			}
-			item["faultdetail"] = raw2
+	}
+
+	vmstates, err := me.loadExecutionStates(txIDs)
+	if err != nil {
+		return err
+	}
+
+	faultTxIDs := make([]string, 0, len(page))
+	for _, item := range page {
+		hash, _ := item["hash"].(string)
+		vmstate := vmstates[hash]
+		if vmstate == "" {
+			vmstate = "FAULT"
+		}
+		item["vmstate"] = vmstate
+		if vmstate == "FAULT" && hash != "" {
+			faultTxIDs = append(faultTxIDs, hash)
+		}
+	}
+
+	faultDetails, err := me.loadTransferEvents(faultTxIDs)
+	if err != nil {
+		return err
+	}
+	for _, item := range page {
+		hash, _ := item["hash"].(string)
+		if item["vmstate"] == "FAULT" {
+			item["faultdetail"] = faultDetails[hash]
 		}
 	}
 

@@ -52,7 +52,6 @@ type SourceCode struct {
 	Code          string
 }
 
-
 func sortedBsonKeys(m bson.M) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -165,6 +164,74 @@ func queryTimeoutDuration() time.Duration {
 
 }
 
+func countCacheKey(collection string, index string, filter bson.M) string {
+	var sb strings.Builder
+	sb.WriteString("count:")
+	sb.WriteString(collection)
+	sb.WriteString(index)
+	for _, k := range sortedBsonKeys(filter) {
+		v := filter[k]
+		sb.WriteString(k)
+		fmt.Fprintf(&sb, "%v", v)
+	}
+	h := sha1.New()
+	h.Write([]byte(sb.String()))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (me *T) getCachedCount(key string) (int64, bool) {
+	if me.Redis == nil {
+		return 0, false
+	}
+	raw, err := me.Redis.Get(me.Ctx, key).Result()
+	if err != nil {
+		return 0, false
+	}
+	count, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return count, true
+}
+
+func (me *T) setCachedCount(key string, count int64) {
+	if me.Redis == nil {
+		return
+	}
+	if err := me.Redis.Set(me.Ctx, key, strconv.FormatInt(count, 10), 0).Err(); err != nil {
+		log2.Infof("Redis count cache set error: %v", err)
+	}
+}
+
+func (me *T) countDocuments(collection *mongo.Collection, collectionName string, index string, filter bson.M, queryCtx context.Context) (int64, error) {
+	cacheKey := countCacheKey(collectionName, index, filter)
+	if count, ok := me.getCachedCount(cacheKey); ok {
+		return count, nil
+	}
+
+	var (
+		count int64
+		err   error
+	)
+	if len(filter) == 0 {
+		count, err = collection.EstimatedDocumentCount(queryCtx)
+	} else {
+		co := options.CountOptions{}
+		count, err = collection.CountDocuments(queryCtx, filter, &co)
+	}
+	if err != nil && err != context.DeadlineExceeded {
+		log2.Warnf("count fallback to CountDocuments for %s due to err=%v", collectionName, err)
+		co := options.CountOptions{}
+		count, err = collection.CountDocuments(queryCtx, filter, &co)
+	}
+	if err != nil {
+		return 0, err
+	}
+
+	me.setCachedCount(cacheKey, count)
+	return count, nil
+}
+
 func (me *T) GetCollection(args struct {
 	Collection string
 }) (*mongo.Collection, error) {
@@ -268,21 +335,7 @@ func (me *T) QueryAll(args struct {
 	op.SetSort(args.Sort)
 	op.SetLimit(args.Limit)
 	op.SetSkip(args.Skip)
-	var (
-		count int64
-		err   error
-	)
-	if len(args.Filter) == 0 {
-		count, err = collection.EstimatedDocumentCount(queryCtx)
-	} else {
-		co := options.CountOptions{}
-		count, err = collection.CountDocuments(queryCtx, args.Filter, &co)
-	}
-	if err != nil && err != context.DeadlineExceeded {
-		log2.Warnf("count fallback to CountDocuments for %s due to err=%v", args.Collection, err)
-		co := options.CountOptions{}
-		count, err = collection.CountDocuments(queryCtx, args.Filter, &co)
-	}
+	count, err := me.countDocuments(collection, args.Collection, args.Index, args.Filter, queryCtx)
 	if err != nil {
 		return nil, 0, stderr.ErrFind
 	}
@@ -337,11 +390,8 @@ func (me *T) QueryAllWithCursor(args struct {
 	CursorFilter bson.M
 }, ret *json.RawMessage) ([]map[string]interface{}, int64, error) {
 
-	if args.Limit == 0 {
-		args.Limit = consts.DefaultLimit
-	} else if args.Limit > consts.MaxLimit {
-		args.Limit = consts.MaxLimit
-	}
+	args.Limit = normalizeLimit(args.Limit)
+	args.Skip = normalizeSkip(args.Skip)
 
 	// Merge cursor filter if provided
 	queryFilter := args.Filter
@@ -358,17 +408,17 @@ func (me *T) QueryAllWithCursor(args struct {
 	var results []map[string]interface{}
 	convert := make([]map[string]interface{}, 0)
 	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
+	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
+	defer cancel()
 	op := options.Find()
 	op.SetSort(args.Sort)
 	op.SetLimit(args.Limit)
 	op.SetSkip(skip)
-	co := options.CountOptions{}
-	// Count uses original filter (without cursor) for total count
-	count, err := collection.CountDocuments(me.Ctx, args.Filter, &co)
+	count, err := me.countDocuments(collection, args.Collection, args.Index, args.Filter, queryCtx)
 	if err != nil {
 		return nil, 0, stderr.ErrFind
 	}
-	cursor, err := collection.Find(me.Ctx, queryFilter, op)
+	cursor, err := collection.Find(queryCtx, queryFilter, op)
 	if err == mongo.ErrNoDocuments {
 		return nil, 0, stderr.ErrNotFound
 	}
@@ -376,11 +426,11 @@ func (me *T) QueryAllWithCursor(args struct {
 		return nil, 0, stderr.ErrFind
 	}
 	defer func() {
-		if err := cursor.Close(me.Ctx); err != nil {
+		if err := cursor.Close(queryCtx); err != nil {
 			log2.Errorf("Closing cursor error %v", err)
 		}
 	}()
-	if err = cursor.All(me.Ctx, &results); err != nil {
+	if err = cursor.All(queryCtx, &results); err != nil {
 		return nil, 0, stderr.ErrFind
 	}
 	for _, item := range results {
@@ -657,16 +707,7 @@ func (me *T) QueryDocument(args struct {
 	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
 	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
 	defer cancel()
-	var (
-		count int64
-		err   error
-	)
-	if len(args.Filter) == 0 {
-		count, err = collection.EstimatedDocumentCount(queryCtx)
-	} else {
-		co := options.CountOptions{}
-		count, err = collection.CountDocuments(queryCtx, args.Filter, &co)
-	}
+	count, err := me.countDocuments(collection, args.Collection, args.Index, args.Filter, queryCtx)
 	if err == mongo.ErrNoDocuments {
 		return nil, stderr.ErrNotFound
 	}

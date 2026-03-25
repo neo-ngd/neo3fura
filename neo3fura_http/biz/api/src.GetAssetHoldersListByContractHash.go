@@ -69,25 +69,9 @@ func (me *T) GetAssetHoldersListByContractHash(args struct {
 		page = r1[:args.Limit]
 	}
 
-	// 获取资产的totaluspply
-	var raw1 map[string]interface{}
-	err = me.GetAssetInfoByContractHash(struct {
-		ContractHash h160.T
-		Filter       map[string]interface{}
-		Raw          *map[string]interface{}
-	}{ContractHash: args.ContractHash, Raw: &raw1}, ret)
+	it, err := me.getAssetTotalSupply(args.ContractHash, ret)
 	if err != nil {
 		return err
-	}
-
-	//it, _, err := raw1["totalsupply"].(primitive.Decimal128).BigInt()
-	//if err != nil {
-	//	return err
-	//}
-
-	it, ok := asBigInt(raw1["totalsupply"])
-	if !ok {
-		return stderr.ErrData
 	}
 	itf := new(big.Float).SetInt(it)
 

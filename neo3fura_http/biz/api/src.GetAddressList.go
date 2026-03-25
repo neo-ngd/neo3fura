@@ -77,7 +77,6 @@ func (me *T) GetAddressList(args struct {
 					}},
 					bson.M{"$eq": []interface{}{"$to", "$$address"}},
 				}}}},
-				bson.M{"$group": bson.M{"_id": "$_id"}},
 				bson.M{"$count": "count"},
 			},
 			"as": "nep17transfer"},
@@ -91,7 +90,6 @@ func (me *T) GetAddressList(args struct {
 					bson.M{"$eq": []interface{}{"$from", "$$address"}},
 					bson.M{"$eq": []interface{}{"$to", "$$address"}},
 				}}}},
-				bson.M{"$group": bson.M{"_id": "$_id"}},
 				bson.M{"$count": "count"},
 			},
 			"as": "nep11transfer"},
@@ -110,8 +108,8 @@ func (me *T) GetAddressList(args struct {
 		Index:      "GetAddressInfo",
 		Sort:       bson.M{},
 		Filter:     bson.M{},
-		Pipeline: pipeline,
-		Query: []string{},
+		Pipeline:   pipeline,
+		Query:      []string{},
 	}, ret)
 	if err != nil {
 		return err
