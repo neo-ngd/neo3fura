@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -335,28 +336,43 @@ func (me *T) QueryAll(args struct {
 	op.SetSort(args.Sort)
 	op.SetLimit(args.Limit)
 	op.SetSkip(args.Skip)
-	count, err := me.countDocuments(collection, args.Collection, args.Index, args.Filter, queryCtx)
-	if err != nil {
-		return nil, 0, stderr.ErrFind
-	}
-
-	cursor, err := collection.Find(queryCtx, args.Filter, op)
-	if err == mongo.ErrNoDocuments {
-
-		return nil, 0, stderr.ErrNotFound
-	}
-	if err != nil {
-		return nil, 0, stderr.ErrFind
-	}
-	defer func() {
-
-		if err := cursor.Close(queryCtx); err != nil {
-			log2.Errorf("Closing cursor error %v", err)
+	var (
+		count    int64
+		countErr error
+		findErr  error
+		wg       sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		count, countErr = me.countDocuments(collection, args.Collection, args.Index, args.Filter, queryCtx)
+	}()
+	go func() {
+		defer wg.Done()
+		cursor, err := collection.Find(queryCtx, args.Filter, op)
+		if err == mongo.ErrNoDocuments {
+			findErr = stderr.ErrNotFound
+			return
+		}
+		if err != nil {
+			findErr = stderr.ErrFind
+			return
+		}
+		defer func() {
+			if err := cursor.Close(queryCtx); err != nil {
+				log2.Errorf("Closing cursor error %v", err)
+			}
+		}()
+		if err = cursor.All(queryCtx, &results); err != nil {
+			findErr = stderr.ErrFind
 		}
 	}()
-	if err = cursor.All(queryCtx, &results); err != nil {
-
+	wg.Wait()
+	if countErr != nil {
 		return nil, 0, stderr.ErrFind
+	}
+	if findErr != nil {
+		return nil, 0, findErr
 	}
 	for _, item := range results {
 		if len(args.Query) == 0 {
@@ -414,24 +430,43 @@ func (me *T) QueryAllWithCursor(args struct {
 	op.SetSort(args.Sort)
 	op.SetLimit(args.Limit)
 	op.SetSkip(skip)
-	count, err := me.countDocuments(collection, args.Collection, args.Index, args.Filter, queryCtx)
-	if err != nil {
-		return nil, 0, stderr.ErrFind
-	}
-	cursor, err := collection.Find(queryCtx, queryFilter, op)
-	if err == mongo.ErrNoDocuments {
-		return nil, 0, stderr.ErrNotFound
-	}
-	if err != nil {
-		return nil, 0, stderr.ErrFind
-	}
-	defer func() {
-		if err := cursor.Close(queryCtx); err != nil {
-			log2.Errorf("Closing cursor error %v", err)
+	var (
+		count    int64
+		countErr error
+		findErr  error
+		wg       sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		count, countErr = me.countDocuments(collection, args.Collection, args.Index, args.Filter, queryCtx)
+	}()
+	go func() {
+		defer wg.Done()
+		cursor, err := collection.Find(queryCtx, queryFilter, op)
+		if err == mongo.ErrNoDocuments {
+			findErr = stderr.ErrNotFound
+			return
+		}
+		if err != nil {
+			findErr = stderr.ErrFind
+			return
+		}
+		defer func() {
+			if err := cursor.Close(queryCtx); err != nil {
+				log2.Errorf("Closing cursor error %v", err)
+			}
+		}()
+		if err = cursor.All(queryCtx, &results); err != nil {
+			findErr = stderr.ErrFind
 		}
 	}()
-	if err = cursor.All(queryCtx, &results); err != nil {
+	wg.Wait()
+	if countErr != nil {
 		return nil, 0, stderr.ErrFind
+	}
+	if findErr != nil {
+		return nil, 0, findErr
 	}
 	for _, item := range results {
 		if len(args.Query) == 0 {

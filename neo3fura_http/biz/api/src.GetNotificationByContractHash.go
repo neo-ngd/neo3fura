@@ -21,6 +21,7 @@ func (me *T) GetNotificationByContractHash(args struct {
 
 	sortKeys := []string{"_id"}
 	sortDirs := map[string]int{"_id": -1}
+	queryLimit := args.Limit + 1
 
 	var cursorFilter bson.M
 	if args.Cursor != "" {
@@ -46,16 +47,30 @@ func (me *T) GetNotificationByContractHash(args struct {
 		Sort:         bson.M{"_id": -1},
 		Filter:       bson.M{"contract": args.ContractHash.Val()},
 		Query:        []string{},
-		Limit:        args.Limit,
+		Limit:        queryLimit,
 		Skip:         args.Skip,
 		CursorFilter: cursorFilter,
 	}, ret)
 	if err != nil {
 		return err
 	}
-	r2, err := me.FilterArrayAndAppendCountWithCursor(r1, count, args.Filter, sortKeys)
+	hasNext := int64(len(r1)) > args.Limit
+	page := r1
+	if hasNext {
+		page = r1[:args.Limit]
+	}
+
+	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
 	if err != nil {
 		return err
+	}
+	if hasNext {
+		last := page[len(page)-1]
+		nextCursor := EncodeCursor(last, sortKeys)
+		if nextCursor == "" {
+			return stderr.ErrInvalidArgs
+		}
+		r2["nextCursor"] = nextCursor
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {
