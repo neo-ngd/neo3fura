@@ -38,6 +38,8 @@ func (me *T) GetAssetHoldersByContractHash(args struct {
 	assetTotalsupply, ok := asBigInt(r1["totalsupply"])
 	if !ok {
 		return stderr.ErrData
+	if !ok {
+		return stderr.ErrData
 	}
 
 	var pipeline []bson.M
@@ -118,6 +120,7 @@ func (me *T) GetAssetHoldersByContractHash(args struct {
 			item["tokenid"] = tokenidArr
 
 			itf := new(big.Float).SetInt(assetTotalsupply)
+			itf := new(big.Float).SetInt(assetTotalsupply)
 			var b2 *big.Float = big.NewFloat(float64(balance))
 			dv := new(big.Float).Quo(b2, itf)
 			item["percentage"] = dv
@@ -136,6 +139,15 @@ func (me *T) GetAssetHoldersByContractHash(args struct {
 				}
 				itf := new(big.Float).SetInt(assetTotalsupply)
 				var b2 *big.Float = new(big.Float).SetInt(balance)
+			}
+		} else if asset_type == "NEP17" {
+		for _, item := range r2 {
+			balance, ok := asBigInt(item["balance"])
+			if !ok {
+				return stderr.ErrData
+			}
+			itf := new(big.Float).SetInt(assetTotalsupply)
+			var b2 *big.Float = new(big.Float).SetInt(balance)
 			dv := new(big.Float).Quo(b2, itf)
 			item["percentage"] = dv
 		}
