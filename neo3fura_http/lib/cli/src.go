@@ -233,6 +233,14 @@ func (me *T) countDocuments(collection *mongo.Collection, collectionName string,
 	return count, nil
 }
 
+func (me *T) CachedDocumentCount(args struct {
+	Collection string
+	Index      string
+	Filter     bson.M
+}) (int64, bool) {
+	return me.getCachedCount(countCacheKey(args.Collection, args.Index, args.Filter))
+}
+
 func (me *T) GetCollection(args struct {
 	Collection string
 }) (*mongo.Collection, error) {
@@ -485,6 +493,75 @@ func (me *T) QueryAllWithCursor(args struct {
 	}
 	*ret = json.RawMessage(r)
 	return convert, count, nil
+}
+
+func (me *T) QueryAllWithCursorNoCount(args struct {
+	Collection   string
+	Index        string
+	Sort         bson.M
+	Filter       bson.M
+	Query        []string
+	Limit        int64
+	Skip         int64
+	CursorFilter bson.M
+}, ret *json.RawMessage) ([]map[string]interface{}, error) {
+
+	args.Limit = normalizeLimit(args.Limit)
+	args.Skip = normalizeSkip(args.Skip)
+
+	queryFilter := args.Filter
+	skip := args.Skip
+	if args.CursorFilter != nil {
+		if queryFilter == nil || len(queryFilter) == 0 {
+			queryFilter = args.CursorFilter
+		} else {
+			queryFilter = bson.M{"$and": []interface{}{args.Filter, args.CursorFilter}}
+		}
+		skip = 0
+	}
+
+	var results []map[string]interface{}
+	convert := make([]map[string]interface{}, 0)
+	collection := me.C_online.Database(me.Db_online).Collection(args.Collection)
+	queryCtx, cancel := context.WithTimeout(me.Ctx, queryTimeoutDuration())
+	defer cancel()
+	op := options.Find()
+	op.SetSort(args.Sort)
+	op.SetLimit(args.Limit)
+	op.SetSkip(skip)
+
+	cursor, err := collection.Find(queryCtx, queryFilter, op)
+	if err == mongo.ErrNoDocuments {
+		return nil, stderr.ErrNotFound
+	}
+	if err != nil {
+		return nil, stderr.ErrFind
+	}
+	defer func() {
+		if err := cursor.Close(queryCtx); err != nil {
+			log2.Errorf("Closing cursor error %v", err)
+		}
+	}()
+	if err = cursor.All(queryCtx, &results); err != nil {
+		return nil, stderr.ErrFind
+	}
+	for _, item := range results {
+		if len(args.Query) == 0 {
+			convert = append(convert, item)
+		} else {
+			temp := make(map[string]interface{})
+			for _, v := range args.Query {
+				temp[v] = item[v]
+			}
+			convert = append(convert, temp)
+		}
+	}
+	r, err := json.Marshal(convert)
+	if err != nil {
+		return nil, stderr.ErrFind
+	}
+	*ret = json.RawMessage(r)
+	return convert, nil
 }
 
 func (me *T) SaveJob(args struct {

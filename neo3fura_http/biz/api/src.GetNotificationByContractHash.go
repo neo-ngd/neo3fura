@@ -32,7 +32,9 @@ func (me *T) GetNotificationByContractHash(args struct {
 		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
 	}
 
-	r1, count, err := me.Client.QueryAllWithCursor(struct {
+	filter := bson.M{"contract": args.ContractHash.Val()}
+
+	r1, err := me.Client.QueryAllWithCursorNoCount(struct {
 		Collection   string
 		Index        string
 		Sort         bson.M
@@ -45,7 +47,7 @@ func (me *T) GetNotificationByContractHash(args struct {
 		Collection:   "Notification",
 		Index:        "GetNotificationByContractHash",
 		Sort:         bson.M{"_id": -1},
-		Filter:       bson.M{"contract": args.ContractHash.Val()},
+		Filter:       filter,
 		Query:        []string{},
 		Limit:        queryLimit,
 		Skip:         args.Skip,
@@ -53,6 +55,18 @@ func (me *T) GetNotificationByContractHash(args struct {
 	}, ret)
 	if err != nil {
 		return err
+	}
+	count, ok := me.Client.CachedDocumentCount(struct {
+		Collection string
+		Index      string
+		Filter     bson.M
+	}{
+		Collection: "Notification",
+		Index:      "GetNotificationByContractHash",
+		Filter:     filter,
+	})
+	if !ok {
+		count = -1
 	}
 	hasNext := int64(len(r1)) > args.Limit
 	page := r1
