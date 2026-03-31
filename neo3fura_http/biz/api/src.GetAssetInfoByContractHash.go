@@ -82,12 +82,8 @@ func (me *T) GetAssetInfoByContractHash(args struct {
 	}
 
 	r2, err := me.Client.QueryLastJob(struct{ Collection string }{Collection: "PopularTokens"})
-	if err != nil {
-		return err
-	}
-
 	r1["ispopular"] = false
-	if r2["Populars"] != nil {
+	if err == nil && r2["Populars"] != nil {
 		populars := r2["Populars"].(primitive.A)
 		for _, v := range populars {
 			if r1["hash"] == v {
@@ -96,19 +92,62 @@ func (me *T) GetAssetInfoByContractHash(args struct {
 		}
 	}
 
-	holderCount, err := me.getAssetHolderCount(args.ContractHash, fmt.Sprint(r1["type"]), ret)
+	countDoc, err := me.Client.QueryDocument(struct {
+		Collection string
+		Index      string
+		Sort       bson.M
+		Filter     bson.M
+	}{
+		Collection: "Address-Asset",
+		Index:      "GetAssetInfos",
+		Sort:       bson.M{},
+		Filter:     bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}},
+	}, ret)
 	if err != nil {
 		return err
 	}
+	count := countDoc["total counts"].(int64)
 	if args.Raw != nil {
 		*args.Raw = r1
 	}
-	r1["holders"] = holderCount
+	r1["holders"] = count
 	totalsuply, ok := asBigInt(r1["totalsupply"])
 	if !ok {
 		return stderr.ErrData
 	}
 	r1["totalsupply"] = totalsuply
+	if r1["type"].(string) == "NEP11" {
+		r3, err1 := me.Client.QueryAggregate(
+			struct {
+				Collection string
+				Index      string
+				Sort       bson.M
+				Filter     bson.M
+				Pipeline   []bson.M
+				Query      []string
+			}{
+				Collection: "Address-Asset",
+				Index:      "GetContractList",
+				Sort:       bson.M{},
+				Filter:     bson.M{},
+				Pipeline: []bson.M{
+					bson.M{"$match": bson.M{"asset": args.ContractHash.Val(), "balance": bson.M{"$gt": 0}}},
+					bson.M{"$group": bson.M{"_id": "$address"}},
+					bson.M{"$count": "addressCounts"},
+				},
+				Query: []string{},
+			}, ret)
+		if err1 != nil {
+			return err1
+		}
+
+		if len(r3) > 0 {
+			r1["holders"] = r3[0]["addressCounts"]
+		} else {
+			r1["holders"] = 0
+		}
+
+	}
 
 	r1, err = me.Filter(r1, args.Filter)
 	if err != nil {

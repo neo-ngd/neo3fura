@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"neo3fura_http/lib/type/consts"
 	"neo3fura_http/lib/type/h160"
 	"neo3fura_http/var/stderr"
 
@@ -18,55 +19,52 @@ func (me *T) GetNep17TransferByContractHash(args struct {
 	if args.ContractHash.Valid() == false {
 		return stderr.ErrInvalidArgs
 	}
+	if args.Limit <= 0 {
+		args.Limit = consts.DefaultLimit
+	}
+	if args.Limit > consts.MaxLimit {
+		args.Limit = consts.MaxLimit
+	}
 
 	sortKeys := []string{"_id"}
 	sortDirs := map[string]int{"_id": -1}
-	queryLimit := args.Limit + 1
 
-	var cursorFilter bson.M
+	// Phase 1: fetch transfers without $lookup (limit+1 for hasNext detection)
+	queryLimit := args.Limit + 1
+	pipeline := []bson.M{
+		{"$match": bson.M{"contract": args.ContractHash.Val()}},
+		{"$sort": bson.M{"_id": -1}},
+	}
 	if args.Cursor != "" {
-		cursorValues, err := DecodeCursor(args.Cursor)
+		cursorMatch, err := BuildCursorMatchStage(sortKeys, sortDirs, args.Cursor)
 		if err != nil {
 			return err
 		}
-		cursorFilter = BuildCursorFilter(sortKeys, sortDirs, cursorValues)
+		if cursorMatch != nil {
+			pipeline = append(pipeline, cursorMatch)
+		}
+	} else {
+		pipeline = append(pipeline, bson.M{"$skip": args.Skip})
 	}
+	pipeline = append(pipeline, bson.M{"$limit": queryLimit})
 
-	filter := bson.M{"contract": args.ContractHash.Val()}
-
-	r1, err := me.Client.QueryAllWithCursorNoCount(struct {
-		Collection   string
-		Index        string
-		Sort         bson.M
-		Filter       bson.M
-		Query        []string
-		Limit        int64
-		Skip         int64
-		CursorFilter bson.M
-	}{
-		Collection:   "TransferNotification",
-		Index:        "GetNep17TransferByContractHash",
-		Sort:         bson.M{"_id": -1},
-		Filter:       filter,
-		Query:        []string{},
-		Limit:        queryLimit,
-		Skip:         args.Skip,
-		CursorFilter: cursorFilter,
-	}, ret)
-	if err != nil {
-		return err
-	}
-	count, ok := me.Client.CachedDocumentCount(struct {
+	r1, err := me.Client.QueryAggregate(struct {
 		Collection string
 		Index      string
+		Sort       bson.M
 		Filter     bson.M
+		Pipeline   []bson.M
+		Query      []string
 	}{
 		Collection: "TransferNotification",
 		Index:      "GetNep17TransferByContractHash",
-		Filter:     filter,
-	})
-	if !ok {
-		count = -1
+		Sort:       bson.M{},
+		Filter:     bson.M{},
+		Pipeline:   pipeline,
+		Query:      []string{},
+	}, ret)
+	if err != nil {
+		return err
 	}
 
 	hasNext := int64(len(r1)) > args.Limit
@@ -75,38 +73,78 @@ func (me *T) GetNep17TransferByContractHash(args struct {
 		page = r1[:args.Limit]
 	}
 
-	txIDs := make([]string, 0, len(page))
-	for _, item := range page {
-		txid, ok := item["txid"].(string)
-		if ok && txid != "" {
-			txIDs = append(txIDs, txid)
+	// Phase 2: batch fetch vmstate from Execution for all transfers in page
+	if len(page) > 0 {
+		orConditions := make([]interface{}, 0, len(page))
+		for _, item := range page {
+			orConditions = append(orConditions, bson.M{
+				"txid":      item["txid"],
+				"blockhash": item["blockhash"],
+			})
+		}
+		executions, err := me.Client.QueryFind(struct {
+			Collection string
+			Index      string
+			Sort       bson.M
+			Filter     bson.M
+			Query      []string
+			Limit      int64
+		}{
+			Collection: "Execution",
+			Index:      "GetNep17TransferByContractHash",
+			Sort:       bson.M{},
+			Filter:     bson.M{"$or": orConditions},
+			Query:      []string{"txid", "blockhash", "vmstate"},
+			Limit:      int64(len(page)),
+		}, ret)
+		if err != nil && err != stderr.ErrNotFound {
+			return err
+		}
+
+		// Build lookup map: "txid|blockhash" -> vmstate
+		execMap := make(map[string]string, len(executions))
+		for _, ex := range executions {
+			key := stringify(ex["txid"]) + "|" + stringify(ex["blockhash"])
+			if vs, ok := ex["vmstate"].(string); ok {
+				execMap[key] = vs
+			}
+		}
+		for _, item := range page {
+			key := stringify(item["txid"]) + "|" + stringify(item["blockhash"])
+			if vs, ok := execMap[key]; ok {
+				item["vmstate"] = vs
+			} else {
+				item["vmstate"] = "FAULT"
+			}
 		}
 	}
 
-	vmstates, err := me.loadExecutionStates(txIDs)
-	if err != nil {
-		return err
-	}
-	for _, item := range page {
-		txid, _ := item["txid"].(string)
-		vmstate := vmstates[txid]
-		if vmstate == "" {
-			vmstate = "FAULT"
+	// Count total only on first page (no cursor)
+	var totalCount int64
+	if args.Cursor == "" {
+		countDoc, err := me.Client.QueryDocument(struct {
+			Collection string
+			Index      string
+			Sort       bson.M
+			Filter     bson.M
+		}{
+			Collection: "TransferNotification",
+			Index:      "GetNep17TransferByContractHash",
+			Sort:       bson.M{},
+			Filter:     bson.M{"contract": args.ContractHash.Val()},
+		}, ret)
+		if err != nil {
+			return err
 		}
-		item["vmstate"] = vmstate
+		totalCount = countDoc["total counts"].(int64)
 	}
 
-	r2, err := me.FilterArrayAndAppendCount(page, count, args.Filter)
+	r2, err := me.FilterArrayAndAppendCount(page, totalCount, args.Filter)
 	if err != nil {
 		return err
 	}
 	if hasNext {
-		last := page[len(page)-1]
-		nextCursor := EncodeCursor(last, sortKeys)
-		if nextCursor == "" {
-			return stderr.ErrInvalidArgs
-		}
-		r2["nextCursor"] = nextCursor
+		r2["nextCursor"] = EncodeCursor(page[len(page)-1], sortKeys)
 	}
 	r, err := json.Marshal(r2)
 	if err != nil {
@@ -114,4 +152,14 @@ func (me *T) GetNep17TransferByContractHash(args struct {
 	}
 	*ret = json.RawMessage(r)
 	return nil
+}
+
+func stringify(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
 }
